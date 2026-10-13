@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clientIp, deviceCookieHeader, hashIp, resolveIdentity } from '@/lib/identity';
+import { clientIp, deviceCookieHeader, hashIp, isDeviceId, resolveIdentity } from '@/lib/identity';
 
 const headers = (h: Record<string, string>) => ({ get: (n: string) => h[n.toLowerCase()] ?? null });
 const uuid = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
@@ -45,5 +45,13 @@ describe('deviceCookieHeader', () => {
     expect(c).toContain(`cdm_device=${uuid}`);
     for (const part of ['HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=31536000', 'Secure']) expect(c).toContain(part);
     expect(deviceCookieHeader(uuid, false)).not.toContain('Secure');
+  });
+});
+
+describe('isDeviceId', () => {
+  it('accepts a UUID and rejects anything else', () => {
+    expect(isDeviceId('3f2504e0-4f89-41d3-9a0c-0305e82c3301')).toBe(true);
+    expect(isDeviceId("'; drop table runs;--")).toBe(false);
+    expect(isDeviceId('')).toBe(false);
   });
 });

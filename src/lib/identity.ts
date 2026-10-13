@@ -13,6 +13,10 @@ export interface Identity {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export function isDeviceId(value: string): boolean {
+  return UUID.test(value);
+}
+
 export function hashIp(ip: string, salt: string): string {
   return createHash('sha256').update(`${salt}:${ip}`).digest('hex');
 }
