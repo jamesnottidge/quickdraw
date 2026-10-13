@@ -3,7 +3,7 @@ import { reapStaleRuns } from '@/lib/limits/reaper';
 import { getLedger, reserve } from '@/lib/limits/budget';
 import { getRun } from '@/lib/store/runs';
 import { insertModelCall } from '@/lib/store/modelCalls';
-import { insertEvent } from '@/lib/store/events';
+import { insertEvent, listEvents } from '@/lib/store/events';
 import { loadConfig } from '@/lib/config';
 import { seedRun, testDb } from '../helpers/db';
 
@@ -31,6 +31,9 @@ describe('reapStaleRuns', () => {
     expect(run!.error).toMatch(/terminated/i);
     expect(run!.cost_usd).toBeCloseTo(0.01, 8);
     expect(await getLedger(db, '2026-10-13')).toEqual({ reservedUsd: 0, actualUsd: 0.01, searchReserved: 0, searchUsed: 2 });
+    // the trace ends with a terminal event, so a replay shows "failed" instead of an endless spinner
+    const events = await listEvents(db, runId);
+    expect(events.at(-1)).toMatchObject({ seq: 3, type: 'run_failed' });
   });
 
   it('leaves recent running runs and already-finished runs alone', async () => {

@@ -1,9 +1,9 @@
 import { cookies } from 'next/headers';
 import { DEVICE_COOKIE, resolveIdentity } from '@/lib/identity';
 import { getDb } from '@/lib/store';
-import { listEvents } from '@/lib/store/events';
 import { insertReconnect } from '@/lib/store/reconnects';
-import { getRun } from '@/lib/store/runs';
+import { loadConfig } from '@/lib/config';
+import { getReplay } from '@/lib/server/replay';
 import { upsertSession } from '@/lib/store/sessions';
 
 export const runtime = 'nodejs';
@@ -16,12 +16,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!UUID.test(id)) return Response.json({ error: 'not_found' }, { status: 404 });
   try {
     const db = await getDb();
-    const run = await getRun(db, id);
-    if (!run) return Response.json({ error: 'not_found' }, { status: 404 });
-
-    const events = await listEvents(db, id);
-    const terminal = events.some((e) => e.type === 'run_finished' || e.type === 'run_failed');
-    const active = run.status === 'running' && !terminal;
+    const replay = await getReplay(db, loadConfig(), id);
+    if (!replay) return Response.json({ error: 'not_found' }, { status: 404 });
+    const { run, events, active } = replay;
 
     // A background poll (?poll=1) is not a reconnect; the first open of an in-progress run is.
     if (active && !new URL(req.url).searchParams.has('poll')) {
@@ -38,7 +35,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     }
 
     return Response.json(
-      { run: { id: run.id, prompt: run.prompt, status: run.status }, events, active },
+      { run, events, active },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
