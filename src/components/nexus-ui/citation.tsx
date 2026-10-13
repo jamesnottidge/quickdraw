@@ -308,7 +308,7 @@ function CitationTrigger({
   }
 
   const baseClassName = cn(
-    "inline-flex h-5.5 max-w-full cursor-default items-center rounded-full bg-secondary opacity-100 transition-colors hover:bg-border data-[state=open]:opacity-100 align-middle",
+    "inline-flex h-5.5 max-w-full cursor-pointer items-center rounded-full bg-secondary opacity-100 transition-colors hover:bg-border data-[state=open]:opacity-100 align-middle",
     hasText && showFavicon && "gap-1 py-1 pr-1.5 pl-1",
     hasText && !showFavicon && "px-2 py-1",
     !hasText && showFavicon && "p-1",

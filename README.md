@@ -1,4 +1,4 @@
-# CDM Research Agent
+# Quickdraw
 
 A public, no-account research agent. A general LLM (Muse) plans queries and writes the report; ScaleDown's small
 models score queries, judge page relevance, summarize pages and produce the TLDR. Every run is stored for evals.

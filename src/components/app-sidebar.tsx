@@ -20,6 +20,7 @@ import { useSessions } from '@/hooks/useSessions';
 import { timeAgo } from '@/lib/ui/time-ago';
 import { truncate } from '@/lib/ui/format';
 import { cn } from '@/lib/utils';
+import { HatLogo } from './brand';
 import { ThemeToggle } from './theme-toggle';
 
 const DOT: Record<string, string> = {
@@ -35,8 +36,9 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="gap-3 p-3">
-        <Link href="/" className="px-1 text-sm font-semibold tracking-tight">
-          CDM Research Agent
+        <Link href="/" aria-label="Quickdraw" className="flex items-center gap-2 px-1 text-sm font-semibold tracking-tight">
+          <HatLogo className="size-5" />
+          <span>Quickdraw</span>
         </Link>
         <SidebarMenuButton asChild variant="outline" className="justify-start gap-2">
           <Link href="/">

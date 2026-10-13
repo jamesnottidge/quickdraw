@@ -204,3 +204,26 @@
   filter: invert(1);
   opacity: 0.09;
 }
+
+/* Anything a visitor can press shows a pointer; Tailwind's reset leaves buttons with the default arrow. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="switch"],
+  [role="checkbox"],
+  summary,
+  select,
+  label[for],
+  a[href],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="submit"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}

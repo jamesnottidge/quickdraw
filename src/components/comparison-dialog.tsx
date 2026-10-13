@@ -76,6 +76,7 @@ function Result({ data }: { data: ComparisonResult }) {
   const { harness, alternatives } = data;
   return (
     <div className="flex flex-col gap-4">
+      <div className="hidden sm:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -103,23 +104,38 @@ function Result({ data }: { data: ComparisonResult }) {
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatUsd(a.costUsd)}
-                <span className="ml-1 text-xs text-muted-foreground sm:hidden">{formatRatio(a.costVsHarness)}</span>
               </TableCell>
               <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">{formatRatio(a.costVsHarness)}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {a.wallMs === null ? 'n/a' : formatDuration(a.wallMs)}
-                {a.wallMs !== null && <span className="ml-1 text-xs text-muted-foreground sm:hidden">{formatRatio(a.timeVsHarness)}</span>}
               </TableCell>
               <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">{formatRatio(a.timeVsHarness)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      </div>
+
+      <ul className="flex flex-col gap-2 sm:hidden">
+        <ModelCard label={harness.label} badge="Actual" cost={formatUsd(harness.costUsd)} time={formatDuration(harness.wallMs)} highlight />
+        {alternatives.map((a) => (
+          <ModelCard
+            key={a.id}
+            label={a.label}
+            badge="Estimate"
+            cost={formatUsd(a.costUsd)}
+            costRatio={formatRatio(a.costVsHarness)}
+            time={a.wallMs === null ? 'n/a' : formatDuration(a.wallMs)}
+            timeRatio={a.wallMs === null ? undefined : formatRatio(a.timeVsHarness)}
+          />
+        ))}
+      </ul>
 
       <Accordion type="multiple">
         <AccordionItem value="stages">
           <AccordionTrigger>Where this run&rsquo;s cost went</AccordionTrigger>
           <AccordionContent>
+            <div className="hidden sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -142,6 +158,20 @@ function Result({ data }: { data: ComparisonResult }) {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            <ul className="flex flex-col divide-y sm:hidden">
+              {harness.stages.map((st, i) => (
+                <li key={`${st.stage}-${st.model}-${i}`} className="flex flex-col gap-0.5 py-2.5 text-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-medium capitalize">{st.stage.replace('_', ' ')}</span>
+                    <span className="tabular-nums">{formatUsd(st.costUsd)}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {st.model.split('/').pop()} · {st.calls} {st.calls === 1 ? 'call' : 'calls'} · {st.inputTokens.toLocaleString()} in / {st.outputTokens.toLocaleString()} out
+                  </span>
+                </li>
+              ))}
+            </ul>
           </AccordionContent>
         </AccordionItem>
         <AccordionItem value="method">
@@ -162,5 +192,42 @@ function Result({ data }: { data: ComparisonResult }) {
         {data.benchmarkedAt ? `speeds benchmarked ${day(data.benchmarkedAt)}` : 'speeds not benchmarked yet (time shows n/a)'}
       </p>
     </div>
+  );
+}
+
+function ModelCard({
+  label,
+  badge,
+  cost,
+  costRatio,
+  time,
+  timeRatio,
+  highlight,
+}: {
+  label: string;
+  badge: 'Actual' | 'Estimate';
+  cost: string;
+  costRatio?: string;
+  time: string;
+  timeRatio?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <li className={`rounded-xl border p-3 ${highlight ? 'bg-muted/50' : ''}`}>
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 text-sm font-medium">{label}</span>
+        <Badge variant={highlight ? 'default' : 'outline'} className="shrink-0 font-normal">{badge}</Badge>
+      </div>
+      <dl className="mt-2 grid grid-cols-2 gap-3">
+        <div>
+          <dt className="text-xs text-muted-foreground">Cost</dt>
+          <dd className="text-sm tabular-nums">{cost}{costRatio && <span className="ml-1.5 text-xs text-muted-foreground">{costRatio}</span>}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Time</dt>
+          <dd className="text-sm tabular-nums">{time}{timeRatio && <span className="ml-1.5 text-xs text-muted-foreground">{timeRatio}</span>}</dd>
+        </div>
+      </dl>
+    </li>
   );
 }

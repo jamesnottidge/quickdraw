@@ -366,3 +366,86 @@ test.describe('artifact frame navigation', () => {
     expect(leaked).toEqual([]);
   });
 });
+
+const INTERACTIVE =
+  'button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="switch"], [role="checkbox"], summary, select, label[for], input[type="checkbox"], input[type="radio"], input[type="submit"]';
+
+/** Interactive elements that are on screen and enabled but would not show a pointer cursor. */
+async function nonPointer(page: Page): Promise<string[]> {
+  return page.evaluate((sel) => {
+    const bad: string[] = [];
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if ((el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true') continue;
+      if (getComputedStyle(el).cursor !== 'pointer') {
+        bad.push(`${el.tagName.toLowerCase()}[${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 30)}]`);
+      }
+    }
+    return bad;
+  }, INTERACTIVE);
+}
+
+test.describe('cursor', () => {
+  test('every enabled interactive element shows a pointer cursor', async ({ page }) => {
+    await page.goto('/');
+    expect(await nonPointer(page), 'home').toEqual([]);
+
+    const canvas = await startAndWaitForCanvas(page, 'cursor audit test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Compare cost and speed' })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click();
+    await page.waitForTimeout(400);
+    expect(await nonPointer(page), 'run view with sidebar and canvas').toEqual([]);
+
+    await canvas.getByRole('tab', { name: /Interactive view/ }).click();
+    expect(await nonPointer(page), 'interactive tab').toEqual([]);
+
+    await page.getByRole('button', { name: 'Compare cost and speed' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Cost and speed comparison' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'How this is estimated' }).click();
+    expect(await nonPointer(page), 'comparison dialog').toEqual([]);
+  });
+});
+
+test.describe('brand', () => {
+  test('the app is called Quickdraw, with a hat logo', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle(/Quickdraw/);
+    await expect(page.getByText(/CDM Research/)).toHaveCount(0);
+    const brand = page.getByRole('link', { name: 'Quickdraw', exact: true });
+    await expect(brand).toBeVisible();
+    await expect(brand.locator('svg')).toBeVisible();
+  });
+});
+
+test.describe('comparison on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test('fits the screen: no sideways scrolling, every model shows its cost and time in full', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('mobile comparison test run');
+    await page.getByRole('button', { name: 'Send' }).click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet.getByRole('heading', { name: 'Chunking for legal RAG' })).toBeVisible({ timeout: 30_000 });
+    await sheet.getByRole('button', { name: 'Collapse canvas' }).click();
+    await page.getByRole('button', { name: 'Compare cost and speed' }).click({ timeout: 40_000 });
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Cost and speed comparison' })).toBeVisible();
+    const overflow = await dialog.evaluate((el) => {
+      const kids = Array.from(el.querySelectorAll<HTMLElement>('*')).filter((k) => k.getBoundingClientRect().width > 0);
+      const right = el.getBoundingClientRect().right;
+      return { scroll: el.scrollWidth - el.clientWidth, clipped: kids.filter((k) => k.getBoundingClientRect().right > right + 1).length };
+    });
+    expect(overflow).toEqual({ scroll: 0, clipped: 0 });
+
+    const cards = dialog.getByRole('listitem').filter({ hasText: /Estimate|Actual/ });
+    await expect(cards.first()).toBeVisible();
+    expect(await cards.count()).toBeGreaterThanOrEqual(7);
+    for (const card of await cards.all()) {
+      await expect(card.getByText(/\$/).first()).toBeVisible();
+      await expect(card.getByText(/\d\s?(s|m|ms)\b|n\/a/).first()).toBeVisible();
+    }
+  });
+});

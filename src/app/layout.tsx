@@ -10,8 +10,8 @@ const sans = Geist({ subsets: ['latin'], variable: '--font-geist' });
 const serif = Source_Serif_4({ subsets: ['latin'], variable: '--font-source-serif' });
 
 export const metadata: Metadata = {
-  title: 'CDM Research Agent',
-  description: 'A research agent that pairs a general LLM with small task-specific models.',
+  title: 'Quickdraw',
+  description: 'Quickdraw: a research agent that pairs a general LLM with small task-specific models.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
