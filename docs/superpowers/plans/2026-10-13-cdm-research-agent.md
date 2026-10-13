@@ -21,6 +21,7 @@ Copied from the spec. Every task's requirements include these.
 - Classify `noul` questions: the research question goes in `instructions`, never in `state` (an object with extra keys returns 400); `criteria` must be `{"true": "...", "false": "..."}`; `state` is `{text: ...}`. `score` criteria is an ordered array of 2 to 10 level strings.
 - Classify and extract outputs are non-deterministic; always store raw responses.
 - `classify-1`, `extract` and `summarize` are called non-streaming. Only Muse streams.
+- Muse is a mandatory-reasoning model: reasoning cannot be disabled (400), `max_tokens` includes reasoning tokens, and a small cap returns empty content with `finish_reason: "length"`. Measured on a short report: default effort 1131 reasoning tokens / 13.1 s, `low` 7.5 s, `minimal` 3.5 s. Always send `reasoning.effort` (plan `minimal`, report `low`, via `config.reasoning`) and a generous `max_tokens` (report 8000).
 - Search: Tavily search endpoint only, behind a `SearchBackend` interface. Tavily extract is never used.
 - Nothing acts on anything incomplete: tool calls run only after the stream finishes and their arguments parse; the SSE parser emits only frames terminated by a blank line; every run ends with `run_finished` or `run_failed`.
 - Limits: 5 runs per device per day (configurable), IP limit about 3x, global daily spend cap $5 (config, no redeploy), worst-case reservation per run taken atomically at start, at most 3 scoring rounds, 8 queries, 30 pages, 200k characters per page, `pages` retention 90 days.
@@ -245,6 +246,8 @@ describe('loadConfig', () => {
     expect(c.limits.maxPages).toBe(30);
     expect(c.limits.maxPageChars).toBe(200_000);
     expect(c.scoring.maxRounds).toBe(3);
+    expect(c.reasoning).toEqual({ plan: 'minimal', report: 'low' });
+    expect(c.report.maxTokens).toBe(8000);
     expect(c.maxFunctionMs).toBe(MAX_DURATION_SECONDS * 1000);
     expect(c.maxRunMs).toBeLessThan(c.maxFunctionMs);
   });
@@ -256,17 +259,20 @@ describe('loadConfig', () => {
       SEARCH_BUDGET_PER_DAY: '40',
       TLDR_MODEL: 'summarize',
       PLANNER_MODEL: 'meta/muse-spark-1.3',
+      MUSE_REPORT_EFFORT: 'high',
     });
     expect(c.limits.dailySpendCapUsd).toBe(2.5);
     expect(c.limits.runsPerDevicePerDay).toBe(2);
     expect(c.limits.dailySearchBudget).toBe(40);
     expect(c.tldrModel).toBe('summarize');
     expect(c.models.planner).toBe('meta/muse-spark-1.3');
+    expect(c.reasoning.report).toBe('high');
   });
 
   it('throws on a malformed number or unknown TLDR model instead of silently using a default', () => {
     expect(() => loadConfig({ DAILY_SPEND_CAP_USD: 'five' })).toThrow(/DAILY_SPEND_CAP_USD/);
     expect(() => loadConfig({ TLDR_MODEL: 'gpt' })).toThrow(/TLDR_MODEL/);
+    expect(() => loadConfig({ MUSE_PLAN_EFFORT: 'extreme' })).toThrow(/MUSE_PLAN_EFFORT/);
   });
 });
 ```
@@ -281,9 +287,13 @@ Expected: FAIL, cannot resolve `@/lib/config`.
 ```ts
 export const MAX_DURATION_SECONDS = 300;
 
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+
 export interface AppConfig {
   models: { planner: string; classify: string; extract: string; summarize: string };
   tldrModel: 'extract' | 'summarize';
+  /** Muse always reasons; effort trades answer depth for latency. */
+  reasoning: { plan: ReasoningEffort; report: ReasoningEffort };
   limits: {
     runsPerDevicePerDay: number;
     ipMultiplier: number;
@@ -323,6 +333,13 @@ function num(env: Env, key: string, fallback: number): number {
   return n;
 }
 
+function effort(env: Env, key: string, fallback: ReasoningEffort): ReasoningEffort {
+  const raw = env[key];
+  if (raw === undefined || raw === '') return fallback;
+  if (raw !== 'minimal' && raw !== 'low' && raw !== 'medium' && raw !== 'high') throw new Error(`Invalid ${key}: ${raw}`);
+  return raw;
+}
+
 export function loadConfig(env: Env = process.env): AppConfig {
   const tldr = env.TLDR_MODEL ?? 'extract';
   if (tldr !== 'extract' && tldr !== 'summarize') throw new Error(`Invalid TLDR_MODEL: ${tldr}`);
@@ -335,6 +352,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
       summarize: 'scaledown/summarize',
     },
     tldrModel: tldr,
+    reasoning: { plan: effort(env, 'MUSE_PLAN_EFFORT', 'minimal'), report: effort(env, 'MUSE_REPORT_EFFORT', 'low') },
     limits: {
       runsPerDevicePerDay: num(env, 'RUNS_PER_DEVICE_PER_DAY', 5),
       ipMultiplier: 3,
@@ -357,7 +375,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
       minChars: 200,
     },
     search: { maxResultsPerQuery: 6 },
-    report: { maxTokens: 4000 },
+    report: { maxTokens: 8000 },
     retry: { retries: 1, baseMs: 400 },
     maxRunMs: 270_000,
     maxFunctionMs: MAX_DURATION_SECONDS * 1000,
@@ -1662,9 +1680,9 @@ describe('streamMuse', () => {
   it('sends a streaming request with tools and records it without the API key', async () => {
     const { ctx, calls, records } = testCtx(() => sseResponse(toolStream));
     const tools = [{ type: 'function' as const, function: { name: 'score_queries', description: 'd', parameters: {} } }];
-    for await (const _ of streamMuse(ctx, 'meta/muse', 'plan', { ...req, tools, maxTokens: 500 })) void _;
+    for await (const _ of streamMuse(ctx, 'meta/muse', 'plan', { ...req, tools, maxTokens: 500, reasoningEffort: 'low' })) void _;
     expect(calls[0].url).toBe('https://openrouter.test/api/v1/chat/completions');
-    expect(calls[0].body).toMatchObject({ model: 'meta/muse', stream: true, max_tokens: 500, tools });
+    expect(calls[0].body).toMatchObject({ model: 'meta/muse', stream: true, max_tokens: 500, tools, reasoning: { effort: 'low' } });
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({ stage: 'plan', model: 'meta/muse', httpStatus: 200, costUsd: 0.0001 });
     expect(JSON.stringify(records[0])).not.toContain('sk-test-secret');
@@ -1714,6 +1732,7 @@ Expected: FAIL, `@/lib/models/muse` not found.
 - [ ] **Step 8: Implement `src/lib/models/muse.ts`**
 
 ```ts
+import type { ReasoningEffort } from '@/lib/config';
 import { createSseParser } from '@/lib/sse/parser';
 import { HttpError } from '@/lib/http/errors';
 import type { ModelCtx, Stage } from './types';
@@ -1736,7 +1755,9 @@ export interface MuseTool {
 export interface MuseRequest {
   messages: MuseMessage[];
   tools?: MuseTool[];
+  /** Includes reasoning tokens: keep it generous or the answer can be starved. */
   maxTokens?: number;
+  reasoningEffort?: ReasoningEffort;
 }
 
 export type MuseEvent =
@@ -1774,6 +1795,7 @@ export async function* streamMuse(
   const body: Record<string, unknown> = { model, messages: req.messages, stream: true };
   if (req.tools?.length) body.tools = req.tools;
   if (req.maxTokens) body.max_tokens = req.maxTokens;
+  if (req.reasoningEffort) body.reasoning = { effort: req.reasoningEffort };
 
   const started = Date.now();
   let status = 0;
@@ -1911,11 +1933,13 @@ async function capture(name: string, body: Record<string, unknown>) {
       { role: 'user', content: 'How do chunking strategies affect retrieval quality for legal documents in RAG systems?' },
     ],
     tools: planTools,
-    max_tokens: 600,
+    max_tokens: 1000,
+    reasoning: { effort: 'minimal' },
   });
   await capture('muse-text-stream.sse', {
     messages: [{ role: 'user', content: 'Write two short sentences about document chunking.' }],
-    max_tokens: 120,
+    max_tokens: 800,
+    reasoning: { effort: 'minimal' },
   });
 })();
 ```
@@ -4782,15 +4806,17 @@ const textOnly = (t = 'hmm'): MuseEvent[] => [{ type: 'text', delta: t }, { ...f
 
 function scripted(steps: MuseEvent[][]) {
   const seen: MuseMessage[][] = [];
+  const reqs: MuseRequest[] = [];
   let i = 0;
   const muse = (req: MuseRequest): AsyncIterable<MuseEvent> => {
+    reqs.push(req);
     seen.push(JSON.parse(JSON.stringify(req.messages)));
     const events = steps[i++] ?? textOnly();
     return (async function* () {
       for (const e of events) yield e;
     })();
   };
-  return { muse, seen };
+  return { muse, seen, reqs };
 }
 
 const scorer = (table: Record<string, number>, fail: string[] = []) => async (q: string) => {
@@ -4802,7 +4828,7 @@ const scorer = (table: Record<string, number>, fail: string[] = []) => async (q:
 const deps = (steps: MuseEvent[][], table: Record<string, number> = {}, fail: string[] = []) => {
   const s = scripted(steps);
   const d: PlanDeps = { config, muse: s.muse, scoreQuery: scorer(table, fail) };
-  return { d, seen: s.seen };
+  return { d, seen: s.seen, reqs: s.reqs };
 };
 
 const types = (events: { type: string }[]) => events.map((e) => e.type);
@@ -4816,7 +4842,7 @@ describe('normalizeQueries', () => {
 
 describe('planQueries', () => {
   it('scores, revises a vague query, then submits', async () => {
-    const { d, seen } = deps(
+    const { d, seen, reqs } = deps(
       [
         call('c1', 'score_queries', { queries: ['ai', 'legal rag chunking strategies 2025'] }),
         call('c2', 'score_queries', { queries: ['ai in legal contract review', 'legal rag chunking strategies 2025'] }),
@@ -4838,6 +4864,7 @@ describe('planQueries', () => {
       { query: 'ai', score: 0.4, band: 'vague' },
       { query: 'legal rag chunking strategies 2025', score: 2.8, band: 'precise' },
     ]);
+    expect(reqs[0].reasoningEffort).toBe('minimal');
     expect(seen[0][0].role).toBe('system');
     expect(seen[0][1]).toEqual({ role: 'user', content: 'research legal rag' });
   });
@@ -4991,7 +5018,7 @@ export async function* planQueries(prompt: string, deps: PlanDeps): AsyncGenerat
     let text = '';
     const calls: CompleteToolCall[] = [];
     const invalid: InvalidToolCall[] = [];
-    for await (const ev of deps.muse({ messages, tools: planTools })) {
+    for await (const ev of deps.muse({ messages, tools: planTools, reasoningEffort: config.reasoning.plan })) {
       if (ev.type === 'text') text += ev.delta;
       else if (ev.type === 'tool_drafting') {
         if (ev.name === 'score_queries' && rounds < config.scoring.maxRounds) {
@@ -5558,12 +5585,18 @@ describe('writeReport', () => {
     expect(result).toContain('## Sources');
     expect(requests[0].tools).toBeUndefined();
     expect(requests[0].maxTokens).toBe(config.report.maxTokens);
+    expect(requests[0].reasoningEffort).toBe(config.reasoning.report);
   });
 
   it('notes a truncated report instead of ending mid-sentence silently', async () => {
     const { muse } = museOf(['# T\n\nHalf a sent'], 'length');
     const { result } = await drain(writeReport('q', summaries, { config, muse }));
     expect(result).toMatch(/cut off/i);
+  });
+
+  it('explains an empty report caused by the token budget being spent on reasoning', async () => {
+    const { muse } = museOf([], 'length');
+    await expect(drain(writeReport('q', summaries, { config, muse }))).rejects.toThrow(/token budget/i);
   });
 
   it('throws on an empty report', async () => {
@@ -5648,6 +5681,7 @@ export async function* writeReport(
   for await (const ev of deps.muse({
     messages: buildReportMessages(question, summaries),
     maxTokens: deps.config.report.maxTokens,
+    reasoningEffort: deps.config.reasoning.report,
   })) {
     if (ev.type === 'text') {
       full += ev.delta;
@@ -5658,7 +5692,13 @@ export async function* writeReport(
     }
   }
   yield* flush();
-  if (full.trim() === '') throw new Error('The model returned an empty report');
+  if (full.trim() === '') {
+    throw new Error(
+      finishReason === 'length'
+        ? 'The model used its whole token budget thinking and returned no report'
+        : 'The model returned an empty report',
+    );
+  }
 
   let tail = '';
   if (finishReason === 'length') tail += '\n\n*(The report was cut off at the length limit.)*';
@@ -7407,7 +7447,8 @@ async function check(name: string, fn: () => Promise<string>) {
     for await (const ev of streamMuse(ctx, config.models.planner, 'plan', {
       messages: [{ role: 'system', content: PLANNER_SYSTEM }, { role: 'user', content: 'Research how bees navigate.' }],
       tools: planTools,
-      maxTokens: 400,
+      maxTokens: 1000,
+      reasoningEffort: config.reasoning.plan,
     })) kinds.push(ev.type === 'tool_call' ? `tool_call:${ev.call.name}` : ev.type);
     if (!kinds.some((k) => k.startsWith('tool_call:'))) throw new Error(`no tool call: ${kinds.join(',')}`);
     return kinds.join(' ');
@@ -7605,6 +7646,7 @@ Design: `docs/superpowers/specs/2026-10-13-cdm-research-agent-design.md`.
 | `SEARCH_BUDGET_PER_DAY` | Global daily search calls (default 100; use ~30 on Tavily's 1,000/month free tier) |
 | `TLDR_MODEL` | `extract` (default) or `summarize` |
 | `PLANNER_MODEL` | Override the planner/writer model |
+| `MUSE_PLAN_EFFORT` / `MUSE_REPORT_EFFORT` | Muse reasoning effort: `minimal`, `low` (default for report), `medium`, `high`. Higher is slower |
 
 ## Operations
 
