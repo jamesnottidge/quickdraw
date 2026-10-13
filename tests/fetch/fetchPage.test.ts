@@ -32,6 +32,16 @@ describe('fetchPage', () => {
     await expect(fetchPage('https://example.com/wall', d)).rejects.toThrow(/little content/i);
   });
 
+  it('REVIEW FOCUS (final review): a link-heavy sign-in page is rejected on readable text, not markdown length', async () => {
+    const nav = ['world/politics', 'business/markets', 'technology/ai', 'sport/football', 'culture/film', 'science/space']
+      .map((p) => `<a href="https://news.example.com/${p}/section-front">${p.split('/')[0]}</a>`)
+      .join('');
+    const { d } = deps(() =>
+      html(`<html><head><title>Sign in</title></head><body><nav>${nav}</nav><h1>Sign in to continue</h1><form><label>Email<input></label><button>Continue</button></form></body></html>`),
+    );
+    await expect(fetchPage('https://news.example.com/article', d)).rejects.toThrow(/little content/i);
+  });
+
   it('follows redirects, re-checking every hop for SSRF', async () => {
     const { d, calls } = deps((url) =>
       url === 'https://example.com/a'

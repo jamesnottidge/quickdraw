@@ -142,10 +142,11 @@ export async function fetchPage(url: string, deps: FetchPageDeps): Promise<Fetch
 
   const { bytes, truncated } = await readCapped(res, limits.maxBytes);
   const text = decode(bytes, contentType);
-  const { title, markdown } = isHtml
+  const { title, markdown, textChars } = isHtml
     ? htmlToMarkdown(text)
-    : { title: '', markdown: text.replaceAll('\u0000', '').trim() };
-  if (markdown.length < limits.minChars) throw new FetchError('Page has too little content to use');
+    : { title: '', markdown: text.replaceAll('\u0000', '').trim(), textChars: text.trim().length };
+  // Judge usefulness by readable text; markdown length also counts every link URL.
+  if (textChars < limits.minChars) throw new FetchError('Page has too little content to use');
   return {
     kind: 'markdown',
     url,

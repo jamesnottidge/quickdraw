@@ -17,6 +17,13 @@ describe('htmlToMarkdown', () => {
     expect(markdown.length).toBeGreaterThan(400);
   });
 
+  it('reports readable text length separately from markdown length (links inflate markdown)', () => {
+    const links = Array.from({ length: 8 }, (_, i) => `<a href="https://example.com/a/very/long/path/number/${i}">go</a>`).join(' ');
+    const { markdown, textChars } = htmlToMarkdown(`<html><body><nav>${links}</nav><p>Hi</p></body></html>`);
+    expect(textChars).toBeLessThan(40);
+    expect(markdown.length).toBeGreaterThan(200);
+  });
+
   it('removes scripts and NUL characters', () => {
     const { markdown } = htmlToMarkdown(`<html><body><script>alert(1)</script><p>Hello\u0000 world</p></body></html>`);
     expect(markdown).not.toContain('alert');
