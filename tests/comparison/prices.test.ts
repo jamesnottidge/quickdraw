@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createPriceProvider } from '@/lib/comparison/prices';
-import { jsonResponse, makeFetch } from '../helpers/http';
+import { hang, jsonResponse, makeFetch } from '../helpers/http';
 
 const listing = (entries: Record<string, [string, string]>) => ({
   data: Object.entries(entries).map(([id, [p, c]]) => ({ id, pricing: { prompt: p, completion: c } })),
@@ -44,5 +44,33 @@ describe('createPriceProvider', () => {
     const { fetchImpl } = makeFetch(() => jsonResponse(listing({ 'bad/model': ['free', 'n/a'], 'a/model': ['0.000002', '0.00001'] })));
     const out = await createPriceProvider({ fetchImpl, snapshot }).get(['a/model', 'bad/model', 'nowhere/model']);
     expect(Object.keys(out.prices)).toEqual(['a/model']);
+  });
+
+  it('REVIEW (final): a hung price fetch gives up quickly and falls back to the snapshot', async () => {
+    const { fetchImpl } = makeFetch(hang);
+    const started = Date.now();
+    const out = await createPriceProvider({ fetchImpl, snapshot, timeoutMs: 20 }).get(['a/model']);
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(out.prices['a/model']).toEqual({ in: 1e-6, out: 2e-6 });
+  });
+
+  it('REVIEW (final): a failed fetch is remembered briefly instead of being retried on every request', async () => {
+    let now = 0;
+    const { fetchImpl, calls } = makeFetch(() => jsonResponse({}, 503));
+    const p = createPriceProvider({ fetchImpl, snapshot, failureTtlMs: 60_000, now: () => now });
+    await p.get(['a/model']);
+    now = 30_000;
+    await p.get(['a/model']);
+    expect(calls).toHaveLength(1);
+    now = 61_000;
+    await p.get(['a/model']);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('REVIEW (final): reports the snapshot date when any price came from the snapshot', async () => {
+    const { fetchImpl } = makeFetch(() => jsonResponse(listing({ 'a/model': ['0.000002', '0.00001'] })));
+    const p = createPriceProvider({ fetchImpl, snapshot, now: () => Date.parse('2026-10-13T12:00:00Z') });
+    expect((await p.get(['a/model'])).asOf).toBe('2026-10-13T12:00:00.000Z'); // all live
+    expect((await p.get(['a/model', 'old/only'])).asOf).toBe('2026-01-01T00:00:00.000Z'); // one from the snapshot
   });
 });
