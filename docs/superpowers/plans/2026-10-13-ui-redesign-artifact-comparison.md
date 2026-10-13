@@ -1621,10 +1621,11 @@ export const COMPARISON_MODELS: { id: string; label: string }[] = [
   { id: 'openai/gpt-6-sol', label: 'GPT-6 Sol' },
 ];
 ```
-`src/lib/comparison/benchmarks.json` (filled in by `scripts/benchmark-models.ts`; until then no times are shown):
+`src/lib/comparison/benchmarks.json`:
 ```json
 { "benchmarkedAt": null, "prompt": null, "models": {} }
 ```
+(Filled in by `scripts/benchmark-models.ts` in Task 14; until then no times are shown.)
 `src/lib/comparison/prices.snapshot.json` (fallback prices; refreshed by `scripts/benchmark-models.ts --prices-only`; the values below are the current OpenRouter prices for the six models above, USD per token):
 ```json
 {

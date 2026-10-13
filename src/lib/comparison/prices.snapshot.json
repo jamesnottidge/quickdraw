@@ -1,0 +1,11 @@
+{
+  "fetchedAt": "2026-10-13T00:00:00.000Z",
+  "prices": {
+    "meta/muse-spark-1.3": { "in": 0.00000125, "out": 0.00000425 },
+    "anthropic/claude-haiku-5.5": { "in": 0.0000001, "out": 0.0000005 },
+    "anthropic/claude-sonnet-5.5": { "in": 0.000002, "out": 0.00001 },
+    "anthropic/claude-opus-5.5": { "in": 0.000004, "out": 0.00002 },
+    "openai/gpt-6-luna": { "in": 0.0000001, "out": 0.0000005 },
+    "openai/gpt-6-sol": { "in": 0.000002, "out": 0.00001 }
+  }
+}
