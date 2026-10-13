@@ -1822,6 +1822,7 @@ export async function buildComparison(
         'Each alternative runs every step end to end with the same inputs this run used, priced at the model\'s current OpenRouter per-token prices.',
         'Query-scoring and relevance-judging calls are assumed to need 20 output tokens each when a general model does them; other steps keep this run\'s measured output size.',
         'Time re-times only the model work using each model\'s benchmarked first-token latency and generation speed, keeping this run\'s parallelism. Search, page fetching and overhead are identical in every row.',
+        'First-token latency was measured on a 300-word generation and is applied to every call, which overstates short calls on models that reason before they answer.',
         'Answer quality is not compared. Reasoning models may spend extra tokens that are not modelled.',
       ],
     },
@@ -1910,7 +1911,13 @@ async function benchOne(id: string) {
     let first: number | null = null;
     let chars = 0;
     try {
-      for await (const ev of streamMuse(ctx, id, 'plan', { messages: [{ role: 'user', content: PROMPT }], maxTokens: 1500 })) {
+      // Muse always reasons, and its reasoning tokens count against max_tokens: give it a reasoning setting and headroom.
+      const reasoning = id.startsWith('meta/muse');
+      for await (const ev of streamMuse(ctx, id, 'plan', {
+        messages: [{ role: 'user', content: PROMPT }],
+        maxTokens: reasoning ? 4000 : 1500,
+        reasoningEffort: reasoning ? 'low' : undefined,
+      })) {
         if (ev.type === 'text') {
           if (first === null) first = performance.now();
           chars += ev.delta.length;

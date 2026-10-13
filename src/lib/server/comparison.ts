@@ -95,6 +95,7 @@ export async function buildComparison(
         'Each alternative runs every step end to end with the same inputs this run used, priced at the model\'s current OpenRouter per-token prices.',
         'Query-scoring and relevance-judging calls are assumed to need 20 output tokens each when a general model does them; other steps keep this run\'s measured output size.',
         'Time re-times only the model work using each model\'s benchmarked first-token latency and generation speed, keeping this run\'s parallelism. Search, page fetching and overhead are identical in every row.',
+        'First-token latency was measured on a 300-word generation and is applied to every call, which overstates short calls on models that reason before they answer.',
         'Answer quality is not compared. Reasoning models may spend extra tokens that are not modelled.',
       ],
     },

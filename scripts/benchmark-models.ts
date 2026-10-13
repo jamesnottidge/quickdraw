@@ -46,7 +46,13 @@ async function benchOne(id: string) {
     let first: number | null = null;
     let chars = 0;
     try {
-      for await (const ev of streamMuse(ctx, id, 'plan', { messages: [{ role: 'user', content: PROMPT }], maxTokens: 1500 })) {
+      // Muse always reasons, and its reasoning tokens count against max_tokens: give it a reasoning setting and headroom.
+      const reasoning = id.startsWith('meta/muse');
+      for await (const ev of streamMuse(ctx, id, 'plan', {
+        messages: [{ role: 'user', content: PROMPT }],
+        maxTokens: reasoning ? 4000 : 1500,
+        reasoningEffort: reasoning ? 'low' : undefined,
+      })) {
         if (ev.type === 'text') {
           if (first === null) first = performance.now();
           chars += ev.delta.length;

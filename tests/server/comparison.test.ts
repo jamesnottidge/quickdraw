@@ -54,6 +54,7 @@ describe('buildComparison', () => {
     expect(result.benchmarkedAt).toBe('2026-10-12T00:00:00.000Z');
     expect(result.assumptions.join(' ')).toMatch(/20 output tokens/);
     expect(result.assumptions.join(' ')).toMatch(/quality/i);
+    expect(result.assumptions.join(' ')).toMatch(/overstates short calls/i);
   });
 
   it('answers not-found for an unknown run and not-finished before run_finished', async () => {
