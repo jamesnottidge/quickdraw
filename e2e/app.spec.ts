@@ -44,3 +44,40 @@ test.describe('app shell', () => {
     await expect.poll(() => html.evaluate((el) => el.classList.contains('dark'))).toBe(!before);
   });
 });
+
+/** Starts a run and reads its stream to the end, returning the run id. */
+async function finishedRunId(page: Page, prompt: string): Promise<string> {
+  const id = await page.evaluate(async (p) => {
+    const res = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: p }),
+    });
+    const reader = res.body!.getReader();
+    while (!(await reader.read()).done) { /* drain */ }
+    return res.headers.get('x-run-id');
+  }, prompt);
+  return id as string;
+}
+
+test.describe('run view', () => {
+  test('a finished run shows the prompt, the timeline with its details, and the TLDR', async ({ page }) => {
+    await page.goto('/');
+    const id = await finishedRunId(page, 'legal rag chunking strategies');
+    await page.goto(`/run/${id}`);
+
+    await expect(page.getByText('legal rag chunking strategies').first()).toBeVisible();
+    await expect(page.getByText(/Section-aware chunking helps legal RAG retrieve whole clauses/)).toBeVisible();
+
+    const trigger = page.getByRole('button', { name: /Research complete/ }).first();
+    if (!(await page.getByText('legal RAG chunking strategies retrieval quality').first().isVisible())) await trigger.click();
+    for (const step of ['Plan', 'Search', 'Read', 'Write', 'Interactive view']) {
+      await expect(page.getByText(step, { exact: true }).first()).toBeVisible();
+    }
+  });
+
+  test('shows a clear message for a run that does not exist', async ({ page }) => {
+    await page.goto('/run/00000000-0000-4000-8000-000000000000');
+    await expect(page.getByRole('alert').filter({ hasText: /doesn.t exist/ })).toBeVisible();
+  });
+});

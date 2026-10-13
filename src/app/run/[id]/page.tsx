@@ -1,26 +1,24 @@
 'use client';
 
 import { use } from 'react';
-import Link from 'next/link';
-import { PrivacyNotice } from '@/components/PrivacyNotice';
-import { RunScreen } from '@/components/RunScreen';
+import { RunScreen } from '@/components/run-screen';
 import { useReplay } from '@/hooks/useRunStream';
+
+function Centered({ children, error }: { children: React.ReactNode; error?: boolean }) {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <p role={error ? 'alert' : undefined} className={error ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>
+        {children}
+      </p>
+    </div>
+  );
+}
 
 export default function RunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { view, state } = useReplay(id);
-  return (
-    <main className="app">
-      <header className="masthead">
-        <h1>
-          <Link href="/">CDM Research Agent</Link>
-        </h1>
-      </header>
-      {state === 'loading' && <p className="muted">Loading run…</p>}
-      {state === 'missing' && <p role="alert" className="error">That run doesn&rsquo;t exist.</p>}
-      {state === 'error' && <p role="alert" className="error">Couldn&rsquo;t load this run. Try reloading.</p>}
-      {state === 'ready' && <RunScreen view={view} />}
-      <PrivacyNotice />
-    </main>
-  );
+  if (state === 'loading') return <Centered>Loading run…</Centered>;
+  if (state === 'missing') return <Centered error>That run doesn&rsquo;t exist.</Centered>;
+  if (state === 'error') return <Centered error>Couldn&rsquo;t load this run. Try reloading.</Centered>;
+  return <RunScreen view={view} runId={id} />;
 }
