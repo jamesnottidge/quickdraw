@@ -7,13 +7,13 @@ describe('migrate', () => {
   it('creates every table, and running it twice is a no-op', async () => {
     const db = await createPgliteDb();
     const first = await migrate(db);
-    expect(first).toEqual(['001_init.sql']);
+    expect(first).toEqual(['001_init.sql', '002_quota.sql']);
     expect(await migrate(db)).toEqual([]);
     const tables = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables where table_schema = 'public' order by 1`,
     );
     const names = tables.map((t) => t.table_name);
-    for (const t of ['sessions', 'runs', 'events', 'model_calls', 'pages', 'reconnects', 'spend_ledger']) {
+    for (const t of ['sessions', 'runs', 'events', 'model_calls', 'pages', 'reconnects', 'spend_ledger', 'quota_usage']) {
       expect(names).toContain(t);
     }
   });

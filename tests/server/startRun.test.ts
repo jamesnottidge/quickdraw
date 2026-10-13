@@ -102,6 +102,28 @@ describe('startRun', () => {
     expect((second as any).message).toMatch(/tomorrow/i);
   });
 
+  it('REVIEW (final): a burst of parallel starts from one device admits only its daily quota', async () => {
+    const db = await testDb();
+    const config = loadConfig({ RUNS_PER_DEVICE_PER_DAY: '2' });
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => startRun({ db, config, identity, prompt: `burst run ${i}`, buildDeps: buildDeps() })),
+    );
+    const ok = results.filter((r) => r.ok);
+    expect(ok).toHaveLength(2);
+    expect(results.filter((r) => !r.ok).every((r: any) => r.code === 'quota')).toBe(true);
+    await Promise.all(ok.map((r: any) => r.done));
+    const [{ n }] = await db.query<{ n: number }>('select count(*)::int as n from runs');
+    expect(n).toBe(2);
+  });
+
+  it('gives the visitor their quota back when the global budget refuses the run', async () => {
+    const db = await testDb();
+    const refused = await startRun({ db, config: loadConfig({ DAILY_SPEND_CAP_USD: '0.1' }), identity, prompt: 'over budget', buildDeps: buildDeps() });
+    expect(refused).toMatchObject({ ok: false, code: 'spend' });
+    const [{ used }] = await db.query<{ used: number }>('select coalesce(sum(count), 0)::int as used from quota_usage');
+    expect(used).toBe(0);
+  });
+
   it('refuses when the global daily spend cap would be exceeded', async () => {
     const db = await testDb();
     const config = loadConfig({ DAILY_SPEND_CAP_USD: '0.1' });

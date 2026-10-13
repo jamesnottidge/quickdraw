@@ -1,26 +1,46 @@
 import type { AppConfig } from '@/lib/config';
 import type { Db } from '@/lib/store/db';
 
-export type QuotaResult = { ok: true } | { ok: false; reason: 'device' | 'ip'; limit: number };
+export type QuotaClaim = { ok: true } | { ok: false; reason: 'device' | 'ip'; limit: number };
 
-export async function checkQuota(
-  db: Db,
-  cfg: AppConfig,
-  who: { deviceId: string; ipHash: string },
-  now = new Date(),
-): Promise<QuotaResult> {
-  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
-  const [row] = await db.query<{ device_runs: number; ip_runs: number }>(
-    `select
-       (select count(*)::int from runs r join sessions s on s.id = r.session_id
-         where s.device_id = $1 and r.started_at >= $3::timestamptz) as device_runs,
-       (select count(*)::int from runs r join sessions s on s.id = r.session_id
-         where s.ip_hash = $2 and r.started_at >= $3::timestamptz) as ip_runs`,
-    [who.deviceId, who.ipHash, dayStart],
+type Who = { deviceId: string; ipHash: string };
+
+const utcDay = (d: Date) => d.toISOString().slice(0, 10);
+const deviceKey = (w: Who) => `device:${w.deviceId}`;
+const ipKey = (w: Who) => `ip:${w.ipHash}`;
+
+/** One conditional upsert per key: it increments only while the counter is under the limit. */
+async function claim(db: Db, day: string, key: string, limit: number): Promise<boolean> {
+  const rows = await db.query(
+    `insert into quota_usage(day, key, count) values ($1::date, $2, 1)
+     on conflict (day, key) do update set count = quota_usage.count + 1
+       where quota_usage.count < $3::int
+     returning count`,
+    [day, key, limit],
   );
+  return rows.length > 0;
+}
+
+export async function releaseQuota(db: Db, who: Who, now = new Date()): Promise<void> {
+  await db.query(
+    `update quota_usage set count = greatest(count - 1, 0) where day = $1::date and key in ($2, $3)`,
+    [utcDay(now), deviceKey(who), ipKey(who)],
+  );
+}
+
+/**
+ * Claims one run for this device and this network for the UTC day. The IP limit is a multiple of
+ * the device limit so a shared office or school network is not locked out by one heavy user.
+ * Call releaseQuota if the run does not start.
+ */
+export async function claimQuota(db: Db, cfg: AppConfig, who: Who, now = new Date()): Promise<QuotaClaim> {
+  const day = utcDay(now);
   const deviceLimit = cfg.limits.runsPerDevicePerDay;
   const ipLimit = deviceLimit * cfg.limits.ipMultiplier;
-  if (Number(row.device_runs) >= deviceLimit) return { ok: false, reason: 'device', limit: deviceLimit };
-  if (Number(row.ip_runs) >= ipLimit) return { ok: false, reason: 'ip', limit: ipLimit };
+  if (!(await claim(db, day, deviceKey(who), deviceLimit))) return { ok: false, reason: 'device', limit: deviceLimit };
+  if (!(await claim(db, day, ipKey(who), ipLimit))) {
+    await db.query(`update quota_usage set count = greatest(count - 1, 0) where day = $1::date and key = $2`, [day, deviceKey(who)]);
+    return { ok: false, reason: 'ip', limit: ipLimit };
+  }
   return { ok: true };
 }

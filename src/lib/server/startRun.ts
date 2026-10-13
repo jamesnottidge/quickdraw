@@ -4,7 +4,7 @@ import type { AppConfig } from '@/lib/config';
 import type { EventBody, RunEvent } from '@/lib/events/schema';
 import type { Identity } from '@/lib/identity';
 import { releaseReservation, reserve, settle } from '@/lib/limits/budget';
-import { checkQuota } from '@/lib/limits/quota';
+import { claimQuota, releaseQuota } from '@/lib/limits/quota';
 import { reapStaleRuns } from '@/lib/limits/reaper';
 import { CostMeter } from '@/lib/models/cost';
 import { runPipeline, type PipelineDeps } from '@/lib/pipeline/run';
@@ -44,7 +44,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
   }
 
   const sessionId = await upsertSession(db, identity);
-  const quota = await checkQuota(db, config, identity, now);
+  const quota = await claimQuota(db, config, identity, now);
   if (!quota.ok) {
     const where = quota.reason === 'device' ? 'this device' : 'this network';
     return {
@@ -57,6 +57,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
 
   const reserved = await reserve(db, config, now);
   if (!reserved.ok) {
+    await releaseQuota(db, identity, now).catch(() => {});
     return {
       ok: false,
       status: 429,
@@ -82,6 +83,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     });
   } catch (e) {
     await releaseReservation(db, reserved.reservation).catch(() => {});
+    await releaseQuota(db, identity, now).catch(() => {});
     throw e;
   }
 
