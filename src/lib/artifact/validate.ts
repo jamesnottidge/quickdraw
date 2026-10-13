@@ -46,18 +46,18 @@ export function validateArtifact(output: string, maxChars: number): ArtifactChec
 }
 
 const CSP_META = `<meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}">`;
+const PREFIX = `<!doctype html>${CSP_META}`;
 
 /**
- * Defence in depth around the sandbox: drop <base> and meta-refresh (navigation tricks) and
- * make the policy the first thing in <head>. Idempotent. No claim is made that stripping tags
- * with patterns is sufficient on its own; the policy and the sandbox are the controls.
+ * Makes the policy the literal first thing in the document. The HTML parser processes it before any
+ * model-written byte, so no comment, string, duplicate <head>, or copy of the policy text in the content
+ * can hide or replace it; the document's own doctype is then ignored, and standards mode comes from ours.
+ * <base> and every http-equiv meta (meta refresh, including entity-obfuscated forms; the attribute name
+ * cannot be obfuscated) are removed as defence in depth. The policy, the iframe sandbox and the host's
+ * frame-src are the controls; tag stripping is not claimed to be sufficient. Idempotent.
  */
 export function hardenArtifactHtml(html: string): string {
-  if (html.includes(CSP_META)) return html;
-  const out = html
-    .replace(/<base\b[^>]*>/gi, '')
-    .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?\s*refresh[^>]*>/gi, '');
-  if (/<head\b[^>]*>/i.test(out)) return out.replace(/<head\b[^>]*>/i, (m) => `${m}${CSP_META}`);
-  if (/<html\b[^>]*>/i.test(out)) return out.replace(/<html\b[^>]*>/i, (m) => `${m}<head>${CSP_META}</head>`);
-  return `<head>${CSP_META}</head>${out}`;
+  if (html.startsWith(PREFIX)) return html;
+  const cleaned = html.replace(/<base\b[^>]*>/gi, '').replace(/<meta\b[^>]*http-equiv[^>]*>/gi, '');
+  return PREFIX + cleaned;
 }
