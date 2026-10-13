@@ -1,5 +1,5 @@
 {
-  "name": "cdm-research-agent",
+  "name": "quickdraw",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -148,7 +148,24 @@ describe('gather', () => {
     });
     const { events, result } = await drain(gather('question', ['q'], dead.deps));
     expect(result).toHaveLength(0);
-    expect(events.filter((e) => e.type === 'page_failed' && /Processing failed/.test((e as any).reason))).toHaveLength(2);
+    expect(events.filter((e) => e.type === 'page_failed' && (e as any).reason === 'Could not analyse this page')).toHaveLength(2);
+    // the provider's raw error body never reaches the trace
+    expect(JSON.stringify(events)).not.toMatch(/HTTP 503|down/);
+  });
+
+  it('skips a page with no readable text without calling any model', async () => {
+    const { deps, judged, summarized } = makeDeps({
+      results: { q: [r('https://empty.test/'), r('https://blank.test/')] },
+      fetchPage: async (url) => md(url, url.includes('empty') ? '' : '   \n  '),
+    });
+    const { events, result } = await drain(gather('question', ['q'], deps));
+    expect(result).toHaveLength(0);
+    expect(judged).toHaveLength(0);
+    expect(summarized).toHaveLength(0);
+    expect(events.filter((e) => e.type === 'page_failed').map((e) => (e as any).reason)).toEqual([
+      'No readable text on this page',
+      'No readable text on this page',
+    ]);
   });
 
   it('treats a search failure as zero results and returns no summaries', async () => {

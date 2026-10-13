@@ -107,7 +107,7 @@ function ReadDetail({ view, done }: { view: RunView; done: boolean }) {
       {view.pageOrder.map((url) => {
         const p = view.pages[url];
         const state =
-          p.status === 'failed' ? { text: p.reason ?? 'failed', cls: 'text-red-600 dark:text-red-400' }
+          p.status === 'failed' ? { text: `skipped · ${p.reason ?? 'unavailable'}`, cls: 'text-muted-foreground' }
           : p.status === 'fetched' ? { text: 'checking relevance…', cls: 'text-muted-foreground' }
           : p.relevant === false ? { text: `not relevant · ${(p.relevance ?? 0).toFixed(2)}`, cls: 'text-muted-foreground' }
           : p.status === 'judged' ? { text: 'summarizing…', cls: 'text-muted-foreground' }

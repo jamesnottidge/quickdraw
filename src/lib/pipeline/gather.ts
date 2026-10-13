@@ -109,6 +109,11 @@ export async function* gather(
         })
         .catch(() => {});
 
+      if (page.kind === 'markdown' && !page.markdown.trim()) {
+        emit({ type: 'page_failed', url: result.url, reason: 'No readable text on this page' });
+        return;
+      }
+
       try {
         // Binary documents are summarized first so relevance is judged on text.
         let text: string;
@@ -137,7 +142,9 @@ export async function* gather(
         emit({ type: 'summary_done', url: result.url, title, summary });
         summaries.push({ url: result.url, title, summary, rank });
       } catch (e) {
-        emit({ type: 'page_failed', url: result.url, reason: `Processing failed: ${errMsg(e)}` });
+        // The provider's error body is for logs, not for a visitor reading the trace.
+        console.warn(`[gather] could not process ${result.url}: ${errMsg(e)}`);
+        emit({ type: 'page_failed', url: result.url, reason: 'Could not analyse this page' });
       }
     }),
     config.fetch.concurrency,
