@@ -119,7 +119,7 @@ describe('UI foundation', () => {
     const { mergeRefs } = await import('@/lib/merge-refs');
     const calls: unknown[] = [];
     const obj = { current: null as unknown };
-    mergeRefs((n: unknown) => calls.push(n), obj)('node');
+    mergeRefs((n: unknown) => { calls.push(n); }, obj)('node');
     expect(calls).toEqual(['node']);
     expect(obj.current).toBe('node');
   });
@@ -167,6 +167,13 @@ mv lib/use-on-change.ts src/lib/
 rmdir components/nexus-ui components lib
 ```
 Expected: the CLI registers the `@nexus-ui` registry in `components.json` itself, pulls shadcn primitives (`button`, `textarea`, `scroll-area`, `tooltip`, `kbd`, `avatar`, `collapsible`, `hover-card`, `carousel`) into `src/components/ui/`, and installs `@hugeicons/*`, `use-stick-to-bottom`, `tldts`, `streamdown` and `radix-ui` as dependencies. The Nexus files and `use-on-change.ts` land in root `components/` and `lib/` (the registry targets `~/components`, not `src/`), which is why the move is needed.
+
+The `text-shimmer` install adds `@import "tw-shimmer";` to `src/app/globals.css` but does not install the package, which makes the build fail with "Can't resolve 'tw-shimmer'". Install it explicitly:
+```bash
+npm install tw-shimmer
+```
+
+If the build still reports it after installing, delete the cached build (`rm -rf .next`) and rebuild; Turbopack caches the failed resolution.
 
 Then add the shadcn primitives the app uses:
 ```bash
