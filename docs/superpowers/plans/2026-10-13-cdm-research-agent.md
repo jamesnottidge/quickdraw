@@ -7339,6 +7339,9 @@ test('blocks a device after its daily quota with a clear message', async ({ page
 });
 
 test('records a reconnect when an in-progress run is reopened', async ({ page, request }) => {
+  // Warm the routes first: a cold dev server compiles them on first hit, which would outlast the fast fake run.
+  await request.get('/api/run/00000000-0000-4000-8000-000000000000');
+  await request.get('/api/stats');
   await page.goto('/');
   // start a run from the page but do not read the stream
   const runId = await page.evaluate(async () => {
