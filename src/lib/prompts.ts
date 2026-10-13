@@ -1,3 +1,5 @@
+import { ARTIFACT_SYSTEM } from '@/lib/artifact/prompt';
+
 export const PLANNER_SYSTEM = `You plan web searches for a research assistant.
 Given the user's research request, draft 3 to 6 distinct web search queries that together would cover it.
 
@@ -51,4 +53,5 @@ export const PROMPTS_SNAPSHOT = {
   relevanceInstructionTemplate: relevanceInstruction('{question}'),
   summarizeInstructionTemplate: summarizeInstruction('{question}'),
   tldrInstruction: TLDR_INSTRUCTION,
+  artifact: ARTIFACT_SYSTEM,
 };
