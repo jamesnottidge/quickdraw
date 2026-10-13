@@ -180,6 +180,25 @@ test.describe('canvas', () => {
     await expect(frame.locator('#probe')).toHaveText('{"cookie":"blocked","parent":"blocked","fetch":"blocked"}');
   });
 
+  test('the canvas opens at about 45% of the content width', async ({ page }) => {
+    const canvas = await startAndWaitForCanvas(page, 'canvas width test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(500);
+    const main = (await page.locator('main').boundingBox())!;
+    const box = (await canvas.boundingBox())!;
+    expect(box.width / main.width).toBeGreaterThan(0.4);
+    expect(box.width / main.width).toBeLessThan(0.5);
+  });
+
+  test('the sidebar closes when research starts', async ({ page }) => {
+    await page.goto('/');
+    const sidebar = page.locator('[data-slot="sidebar"][data-state]').first();
+    await expect(sidebar).toHaveAttribute('data-state', 'expanded');
+    await page.getByRole('textbox').fill('sidebar closes test run');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(sidebar).toHaveAttribute('data-state', 'collapsed');
+  });
+
   test('REVIEW (final): the interactive view keeps its state when switching tabs and back', async ({ page }) => {
     const canvas = await startAndWaitForCanvas(page, 'tab state test run');
     await expect(canvas).toBeVisible({ timeout: 30_000 });

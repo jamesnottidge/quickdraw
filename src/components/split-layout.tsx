@@ -4,6 +4,8 @@ import { useEffect, type ReactNode } from 'react';
 import { usePanelRef } from 'react-resizable-panels';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 
+const CANVAS_SIZE = '45%';
+
 /**
  * Both panels always exist and the canvas panel is collapsed rather than removed, so the thread (and any
  * timeline step the visitor opened) keeps its state when the canvas opens and closes.
@@ -23,7 +25,7 @@ export function SplitLayout({
   useEffect(() => {
     const panel = canvasPanel.current;
     if (!panel) return;
-    if (open && panel.isCollapsed()) panel.expand();
+    if (open && panel.isCollapsed()) panel.resize(CANVAS_SIZE);
     if (!open && !panel.isCollapsed()) panel.collapse();
   }, [open, canvasPanel]);
 
@@ -38,7 +40,7 @@ export function SplitLayout({
         panelRef={canvasPanel}
         collapsible
         collapsedSize={0}
-        defaultSize={open ? '48%' : 0}
+        defaultSize={open ? CANVAS_SIZE : 0}
         minSize="28%"
         onResize={(size) => {
           if (size.asPercentage === 0 && open) onOpenChange(false);
