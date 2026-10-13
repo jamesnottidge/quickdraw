@@ -21,6 +21,13 @@ describe('runPipeline', () => {
     expect(t.indexOf('queries_submitted')).toBeLessThan(t.indexOf('search_started'));
     expect(t.indexOf('summary_done')).toBeLessThan(t.indexOf('report_delta'));
     expect(t.indexOf('report_done')).toBeLessThan(t.indexOf('tldr_done'));
+    expect(t).toContain('sources_ready');
+    expect(t.indexOf('sources_ready')).toBeLessThan(t.indexOf('report_delta'));
+    expect(t).toContain('artifact_done');
+    expect(t.indexOf('tldr_done')).toBeLessThan(t.indexOf('artifact_started'));
+    expect(t.indexOf('artifact_done')).toBeLessThan(t.indexOf('run_finished'));
+    const sourcesEvent = events.find((e) => e.type === 'sources_ready') as any;
+    expect(sourcesEvent.sources.map((s: any) => s.n)).toEqual(sourcesEvent.sources.map((_: any, i: number) => i + 1));
     expect(terminals(events)).toHaveLength(1);
     expect(events.at(-1)).toMatchObject({ type: 'run_finished' });
     expect((events.at(-1) as any).costUsd).toBeGreaterThan(0);
@@ -53,5 +60,19 @@ describe('runPipeline', () => {
     ac.abort();
     const { events } = await drain(runPipeline('p', createFakeDeps({ signal: ac.signal })));
     expect(terminals(events)).toEqual([{ type: 'run_failed', message: 'The run hit its time limit before it could finish.' }]);
+  });
+
+  it('REVIEW FOCUS: a failing artifact never fails the run', async () => {
+    const { events } = await drain(runPipeline('p', createFakeDeps({ failArtifact: true })));
+    expect(types(events)).toContain('artifact_failed');
+    expect(types(events)).not.toContain('artifact_done');
+    expect(terminals(events)).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({ type: 'run_finished' });
+  });
+
+  it('does not run the artifact stage when there are no sources to write about', async () => {
+    const { events } = await drain(runPipeline('obscure', createFakeDeps({ noResults: true })));
+    expect(types(events)).not.toContain('sources_ready');
+    expect(types(events)).not.toContain('artifact_started');
   });
 });

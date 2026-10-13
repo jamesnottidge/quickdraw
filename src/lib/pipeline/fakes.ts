@@ -1,8 +1,10 @@
 import { loadConfig } from '@/lib/config';
 import { FetchError } from '@/lib/fetch/errors';
 import type { FetchedPage } from '@/lib/fetch/fetchPage';
+import { ARTIFACT_SYSTEM } from '@/lib/artifact/prompt';
 import { CostMeter } from '@/lib/models/cost';
 import type { MuseEvent, MuseRequest } from '@/lib/models/muse';
+import type { ModelCallRecord } from '@/lib/models/types';
 import type { PipelineDeps } from './run';
 
 export interface FakeOptions {
@@ -12,6 +14,9 @@ export interface FakeOptions {
   noResults?: boolean;
   failTldr?: boolean;
   museError?: Error;
+  failArtifact?: boolean;
+  /** Called for every fake model call, so fake runs have recorded calls (used by the comparison). */
+  record?: (r: ModelCallRecord) => void | Promise<void>;
 }
 
 const slug = (q: string) => q.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
@@ -20,6 +25,31 @@ const FINISH_STOP: MuseEvent = { type: 'finish', reason: 'stop', costUsd: 0, inp
 
 const REPORT_TEXT =
   '# Chunking for legal RAG\n\nSection-aware chunking improves retrieval recall on long contracts [1].\n\n## Findings\n\n- Fixed windows split clauses from their cross references [2].\n- Parent metadata helps the model cite the right section [1].\n\n## Conclusion\n\nPrefer structure-aware chunking for legal text.\n';
+
+/** A small interactive page that also probes its own sandbox; used by tests and fake mode. */
+export const FAKE_ARTIFACT_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Interactive view</title><style>
+body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#fff;color:#111}
+@media (prefers-color-scheme:dark){body{background:#111;color:#eee}}
+button{padding:8px 14px;border-radius:8px;border:1px solid #888;background:transparent;color:inherit;cursor:pointer}
+pre{background:rgba(127,127,127,.15);padding:12px;border-radius:8px}
+</style></head><body>
+<h1 id="title">Chunking for legal RAG</h1>
+<button id="toggle">Show details</button>
+<p id="details" hidden>Section-aware chunking keeps clauses and cross references together [1].</p>
+<pre id="probe">probing</pre>
+<script>
+document.getElementById('toggle').addEventListener('click', function () {
+  var d = document.getElementById('details'); d.hidden = !d.hidden;
+  this.textContent = d.hidden ? 'Show details' : 'Hide details';
+});
+(async function () {
+  var r = {};
+  try { void document.cookie; r.cookie = 'readable'; } catch (e) { r.cookie = 'blocked'; }
+  try { void parent.document.title; r.parent = 'reachable'; } catch (e) { r.parent = 'blocked'; }
+  try { await fetch(location.origin === 'null' ? 'http://localhost:3100/api/stats' : '/api/stats'); r.fetch = 'reachable'; } catch (e) { r.fetch = 'blocked'; }
+  document.getElementById('probe').textContent = JSON.stringify(r);
+})();
+</script></body></html>`;
 
 /** Scripted, offline pipeline dependencies for tests, e2e and local development (FAKE_MODELS=1). */
 export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
@@ -58,6 +88,13 @@ export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
             });
           }
           yield FINISH_TOOLS;
+        } else if (req.messages[0]?.role === 'system' && req.messages[0].content === ARTIFACT_SYSTEM) {
+          const out = opts.failArtifact ? 'Sorry, I could not build that.' : FAKE_ARTIFACT_HTML;
+          for (const part of out.match(/[\s\S]{1,200}/g) ?? []) {
+            await delay();
+            yield { type: 'text', delta: part };
+          }
+          yield FINISH_STOP;
         } else {
           for (const part of REPORT_TEXT.match(/[\s\S]{1,24}/g) ?? []) {
             await delay();

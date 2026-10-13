@@ -52,7 +52,7 @@ export function buildPipelineDeps(i: {
     config,
     signal,
     cost: meter,
-    muse: (req) => streamMuse(ctx, config.models.planner, req.tools ? 'plan' : 'report', req),
+    muse: (req) => streamMuse(ctx, config.models.planner, req.stage ?? (req.tools ? 'plan' : 'report'), req),
     scoreQuery: (q) => scoreQuery(ctx, config, q),
     judgeRelevance: (question, text) => judgeRelevance(ctx, config, question, text),
     summarize: (input) => summarize(ctx, config, input),

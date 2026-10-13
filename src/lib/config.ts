@@ -6,7 +6,7 @@ export interface AppConfig {
   models: { planner: string; classify: string; extract: string; summarize: string };
   tldrModel: 'extract' | 'summarize';
   /** Muse always reasons; effort trades answer depth for latency. */
-  reasoning: { plan: ReasoningEffort; report: ReasoningEffort };
+  reasoning: { plan: ReasoningEffort; report: ReasoningEffort; artifact: ReasoningEffort };
   limits: {
     runsPerDevicePerDay: number;
     ipMultiplier: number;
@@ -30,6 +30,7 @@ export interface AppConfig {
   };
   search: { maxResultsPerQuery: number };
   report: { maxTokens: number };
+  artifact: { minRemainingMs: number; maxMs: number; maxTokens: number; maxChars: number };
   retry: { retries: number; baseMs: number; museRetries: number };
   maxRunMs: number;
   maxFunctionMs: number;
@@ -65,7 +66,11 @@ export function loadConfig(env: Env = process.env): AppConfig {
       summarize: 'scaledown/summarize',
     },
     tldrModel: tldr,
-    reasoning: { plan: effort(env, 'MUSE_PLAN_EFFORT', 'minimal'), report: effort(env, 'MUSE_REPORT_EFFORT', 'low') },
+    reasoning: {
+      plan: effort(env, 'MUSE_PLAN_EFFORT', 'minimal'),
+      report: effort(env, 'MUSE_REPORT_EFFORT', 'low'),
+      artifact: effort(env, 'MUSE_ARTIFACT_EFFORT', 'low'),
+    },
     limits: {
       runsPerDevicePerDay: num(env, 'RUNS_PER_DEVICE_PER_DAY', 5),
       ipMultiplier: 3,
@@ -89,6 +94,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     search: { maxResultsPerQuery: 6 },
     report: { maxTokens: 8000 },
+    artifact: { minRemainingMs: 100_000, maxMs: 150_000, maxTokens: 16_000, maxChars: 150_000 },
     retry: { retries: 1, baseMs: 400, museRetries: 2 },
     maxRunMs: 270_000,
     maxFunctionMs: MAX_DURATION_SECONDS * 1000,

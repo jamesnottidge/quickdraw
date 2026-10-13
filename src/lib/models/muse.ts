@@ -26,6 +26,10 @@ export interface MuseRequest {
   /** Includes reasoning tokens: keep it generous or the answer can be starved. */
   maxTokens?: number;
   reasoningEffort?: ReasoningEffort;
+  /** Overrides the stage recorded for this call (default: the stage passed to streamMuse). */
+  stage?: Stage;
+  /** A per-request deadline, combined with the run signal. */
+  signal?: AbortSignal;
 }
 
 export type MuseEvent =
@@ -76,6 +80,9 @@ export async function* streamMuse(
   req: MuseRequest,
 ): AsyncGenerator<MuseEvent> {
   const body: Record<string, unknown> = { model, messages: req.messages, stream: true };
+  const effectiveStage = req.stage ?? stage;
+  const outer = [ctx.signal, req.signal].filter((s): s is AbortSignal => !!s);
+  const outerSignal = outer.length ? AbortSignal.any(outer) : undefined;
   if (req.tools?.length) body.tools = req.tools;
   if (req.maxTokens) body.max_tokens = req.maxTokens;
   if (req.reasoningEffort) body.reasoning = { effort: req.reasoningEffort };
@@ -102,7 +109,7 @@ export async function* streamMuse(
           method: 'POST',
           headers: { Authorization: `Bearer ${ctx.apiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
-          signal: ctx.signal ? AbortSignal.any([ctx.signal, headerTimeout.signal]) : headerTimeout.signal,
+          signal: outerSignal ? AbortSignal.any([outerSignal, headerTimeout.signal]) : headerTimeout.signal,
         });
         status = r.status;
         if (!r.ok) throw new HttpError(r.status, await r.text());
@@ -115,6 +122,7 @@ export async function* streamMuse(
 
     const parser = createSseParser();
     reader = res.body.getReader();
+    outerSignal?.addEventListener('abort', () => void reader?.cancel().catch(() => {}), { once: true });
     let finished = false;
     while (!finished) {
       const { value, done } = await readWithIdle(reader, ctx.idleMs ?? DEFAULT_IDLE_MS);
@@ -147,6 +155,7 @@ export async function* streamMuse(
         if (choice.finish_reason) finishReason = choice.finish_reason;
       }
     }
+    if (outerSignal?.aborted) throw outerSignal.reason ?? new DOMException('The request was aborted', 'AbortError');
     await reader.cancel().catch(() => {});
 
     if (finishReason === null) {
@@ -173,7 +182,7 @@ export async function* streamMuse(
     await reader?.cancel().catch(() => {}); // release the connection on error paths too
     try {
       await ctx.record({
-        stage,
+        stage: effectiveStage,
         model,
         request: body,
         response: { content, finishReason, toolCalls: acc.snapshot(), error },

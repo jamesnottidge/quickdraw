@@ -223,3 +223,33 @@ describe.skipIf(!fs.existsSync(textFixture))('real captured Muse text stream', (
     expect(events.at(-1)?.type).toBe('finish');
   });
 });
+
+describe('streamMuse request overrides (artifact stage)', () => {
+  it('records the stage given on the request', async () => {
+    const { ctx, records } = testCtx(() => sseResponse([chunk({ content: 'x' }), chunk({}, 'stop'), DONE]));
+    for await (const _ of streamMuse(ctx, 'm', 'report', { ...req, stage: 'artifact' })) void _;
+    expect(records[0].stage).toBe('artifact');
+  });
+
+  it('aborts when the request signal fires, even in the middle of a stream', async () => {
+    const ac = new AbortController();
+    const stalled = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(new TextEncoder().encode(chunk({ content: 'start' })));
+          },
+        }),
+        { status: 200 },
+      );
+    const { ctx } = testCtx(stalled);
+    const seen: string[] = [];
+    const running = (async () => {
+      for await (const e of streamMuse(ctx, 'm', 'plan', { ...req, signal: ac.signal })) seen.push(e.type);
+    })();
+    await new Promise((r) => setTimeout(r, 20));
+    ac.abort();
+    await expect(running).rejects.toMatchObject({ name: 'AbortError' });
+    expect(seen).toEqual(['text']);
+  });
+});

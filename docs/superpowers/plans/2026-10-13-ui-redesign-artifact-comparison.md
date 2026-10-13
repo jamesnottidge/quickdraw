@@ -634,7 +634,7 @@ git commit -m "feat: add artifact validation, hardening and prompt"
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `tests/config.test.ts` inside the defaults test (after the existing `retry` expectation):
+Update `tests/config.test.ts`. In the defaults test, **change** the existing `expect(c.reasoning).toEqual({ plan: 'minimal', report: 'low' });` to `expect(c.reasoning).toEqual({ plan: 'minimal', report: 'low', artifact: 'low' });` (the new effort would otherwise break it), and after the existing `retry` expectation add:
 ```ts
     expect(c.reasoning.artifact).toBe('low');
     expect(c.artifact).toEqual({ minRemainingMs: 100_000, maxMs: 150_000, maxTokens: 16_000, maxChars: 150_000 });
