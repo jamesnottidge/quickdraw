@@ -122,3 +122,84 @@ test.describe('home', () => {
     await expect(page.getByRole('alert').filter({ hasText: /tomorrow/i })).toBeVisible();
   });
 });
+
+const REPORT_CANVAS = 'Report canvas';
+
+async function startAndWaitForCanvas(page: Page, prompt: string) {
+  await page.goto('/');
+  await page.getByRole('textbox').fill(prompt);
+  await page.getByRole('button', { name: 'Send' }).click();
+  return page.getByRole('complementary', { name: REPORT_CANVAS });
+}
+
+test.describe('canvas', () => {
+  test('stays closed while the report is written, opens by itself when ready, and can be collapsed and reopened', async ({ page }) => {
+    const canvas = await startAndWaitForCanvas(page, 'canvas behaviour test run');
+    await expect(page.getByText('Researching…').first()).toBeVisible();
+    await expect(canvas).toHaveCount(0); // not open during planning, search and reading
+
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await expect(canvas.getByRole('heading', { name: 'Chunking for legal RAG' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Collapse canvas' }).click();
+    await expect(canvas).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open report' }).click();
+    await expect(canvas).toBeVisible();
+  });
+
+  test('citation markers become hover previews and sources become cards', async ({ page }) => {
+    const canvas = await startAndWaitForCanvas(page, 'citation hover test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    const sources = canvas.getByRole('region', { name: 'Sources' });
+    await expect(sources.getByRole('link')).toHaveCount(3);
+
+    const chip = canvas.locator('article').getByText('1', { exact: true }).first();
+    await chip.hover();
+    await expect(page.getByText('example.test').first()).toBeVisible();
+  });
+
+  test('the interactive view runs in a sandbox that cannot reach the page, cookies or network', async ({ page }) => {
+    const canvas = await startAndWaitForCanvas(page, 'sandbox security test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await canvas.getByRole('tab', { name: /Interactive view/ }).click();
+
+    const iframe = canvas.locator('iframe[title="Interactive view"]');
+    await expect(iframe).toBeVisible({ timeout: 30_000 });
+    await expect(iframe).toHaveAttribute('sandbox', 'allow-scripts');
+
+    const frame = page.frameLocator('iframe[title="Interactive view"]');
+    await frame.getByRole('button', { name: 'Show details' }).click(); // it is interactive
+    await expect(frame.getByText(/Section-aware chunking keeps clauses/)).toBeVisible();
+    await expect(frame.locator('#probe')).toHaveText('{"cookie":"blocked","parent":"blocked","fetch":"blocked"}');
+  });
+
+  test('REVIEW FOCUS: a run recorded before artifacts existed still opens, with plain markers and no interactive content', async ({ page }) => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const events = [
+      { runId: id, seq: 1, ts: 1, type: 'run_started', prompt: 'old run' },
+      { runId: id, seq: 2, ts: 2, type: 'report_done', text: '# Old report\n\nA claim [1].\n\n## Sources\n\n1. [Alpha](https://a.test)\n' },
+      { runId: id, seq: 3, ts: 3, type: 'run_finished', costUsd: 0.01 },
+    ];
+    await page.route(`**/api/run/${id}*`, (route) =>
+      route.fulfill({ json: { run: { id, prompt: 'old run', status: 'finished' }, events, active: false } }),
+    );
+    await page.goto(`/run/${id}`);
+    const canvas = page.getByRole('complementary', { name: REPORT_CANVAS });
+    await expect(canvas.getByRole('heading', { name: 'Old report' })).toBeVisible();
+    await expect(canvas.getByText('A claim [1].')).toBeVisible();
+    await expect(canvas.getByRole('link', { name: 'Alpha' })).toBeVisible(); // the markdown Sources list is kept
+    await canvas.getByRole('tab', { name: /Interactive view/ }).click();
+    await expect(canvas.getByText(/No interactive view for this run/)).toBeVisible();
+  });
+});
+
+test.describe('canvas on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test('opens the report in a full-height sheet', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('mobile canvas test run');
+    await page.getByRole('button', { name: 'Send' }).click();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet.getByRole('heading', { name: 'Chunking for legal RAG' })).toBeVisible({ timeout: 30_000 });
+  });
+});

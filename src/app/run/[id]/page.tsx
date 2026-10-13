@@ -20,5 +20,5 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
   if (state === 'loading') return <Centered>Loading run…</Centered>;
   if (state === 'missing') return <Centered error>That run doesn&rsquo;t exist.</Centered>;
   if (state === 'error') return <Centered error>Couldn&rsquo;t load this run. Try reloading.</Centered>;
-  return <RunScreen view={view} runId={id} />;
+  return <RunScreen key={id} view={view} runId={id} />;
 }

@@ -3565,13 +3565,12 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 export function SplitLayout({ left, right }: { left: ReactNode; right: ReactNode | null }) {
   if (!right) return <div className="h-full">{left}</div>;
   return (
-    // react-resizable-panels v4 renamed `direction` to `orientation`; use whichever the generated wrapper declares.
-    <ResizablePanelGroup direction="horizontal" className="h-full">
-      <ResizablePanel defaultSize={52} minSize={30}>
+    <ResizablePanelGroup className="h-full">
+      <ResizablePanel defaultSize="52%" minSize="30%">
         {left}
       </ResizablePanel>
       <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={48} minSize={28}>
+      <ResizablePanel defaultSize="48%" minSize="28%">
         {right}
       </ResizablePanel>
     </ResizablePanelGroup>
@@ -3803,7 +3802,7 @@ export function RunScreen({ view }: { view: RunView; runId: string | null }) {
       <div className="h-full">
         {thread}
         <Sheet open={canvas.open && !!panel} onOpenChange={canvas.setOpen}>
-          <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-full [&>button]:hidden">
+          <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 data-[side=right]:sm:max-w-full">
             <SheetTitle className="sr-only">Report</SheetTitle>
             {panel}
           </SheetContent>
