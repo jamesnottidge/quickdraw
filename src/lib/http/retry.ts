@@ -9,6 +9,7 @@ export interface RetryOpts {
 
 export function isRetryable(err: unknown): boolean {
   if (err instanceof HttpError) return err.status === 429 || err.status >= 500;
+  if ((err as { name?: string } | null)?.name === 'TimeoutError') return true; // a hung call, not a run abort
   return err instanceof TypeError; // fetch network failure
 }
 

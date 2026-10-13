@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { streamMuse, type MuseEvent } from '@/lib/models/muse';
 import { HttpError } from '@/lib/http/errors';
-import { sseResponse, testCtx } from '../helpers/http';
+import { hang, sseResponse, testCtx } from '../helpers/http';
 
 const chunk = (delta: object, finish: string | null = null, extra: object = {}) =>
   `data: ${JSON.stringify({ choices: [{ delta, finish_reason: finish }], ...extra })}\n\n`;
@@ -105,6 +105,97 @@ describe('streamMuse', () => {
       const { events } = await collect([bytes.slice(0, i), bytes.slice(i)]);
       expect(events).toEqual(baseline);
     }
+  });
+});
+
+const noSleep = async () => {};
+
+describe('streamMuse retries and timeouts (final review)', () => {
+  const okChunks = [chunk({ content: 'hi' }), chunk({}, 'stop'), DONE];
+  async function run(handler: Parameters<typeof testCtx>[0], tweak: (ctx: any) => void = () => {}) {
+    const t = testCtx(handler);
+    t.ctx.retry = { retries: 2, baseMs: 1, sleep: noSleep };
+    tweak(t.ctx);
+    const events: MuseEvent[] = [];
+    let error: unknown;
+    try {
+      for await (const e of streamMuse(t.ctx, 'm', 'plan', req)) events.push(e);
+    } catch (e) {
+      error = e;
+    }
+    return { events, error, calls: t.calls };
+  }
+
+  it('retries a 429 when opening the request and then streams normally', async () => {
+    let n = 0;
+    const { events, calls } = await run(() => (++n === 1 ? new Response('slow down', { status: 429 }) : sseResponse(okChunks)));
+    expect(calls).toHaveLength(2);
+    expect(events.map((e) => e.type)).toEqual(['text', 'finish']);
+  });
+
+  it('does not retry a 400', async () => {
+    const { error, calls } = await run(() => new Response('bad', { status: 400 }));
+    expect(error).toBeInstanceOf(HttpError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('gives up after 2 retries on persistent 5xx', async () => {
+    const { error, calls } = await run(() => new Response('down', { status: 503 }));
+    expect(error).toBeInstanceOf(HttpError);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('never retries once output has started (a mid-stream failure surfaces)', async () => {
+    const { events, error, calls } = await run(() =>
+      sseResponse([chunk({ content: 'partial' }), `data: ${JSON.stringify({ error: { message: 'boom' } })}\n\n`]),
+    );
+    expect(events.map((e) => e.type)).toEqual(['text']);
+    expect(String(error)).toMatch(/boom/);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('times out waiting for response headers and retries that', async () => {
+    let n = 0;
+    const { events, calls } = await run(
+      (url, init) => (++n === 1 ? (hang(url, init) as Promise<Response>) : sseResponse(okChunks)),
+      (ctx) => { ctx.timeoutMs = 20; },
+    );
+    expect(calls).toHaveLength(2);
+    expect(events.at(-1)?.type).toBe('finish');
+  });
+
+  it('fails a stream that goes silent mid-way instead of waiting for the run limit', async () => {
+    const stalled = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(new TextEncoder().encode(chunk({ content: 'start' })));
+          },
+        }),
+        { status: 200 },
+      );
+    const { error } = await run(stalled, (ctx) => { ctx.idleMs = 25; });
+    expect(error).toMatchObject({ name: 'TimeoutError' });
+  });
+
+  it('keepalive comments keep a slow-thinking stream alive', async () => {
+    const slow = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          async start(c) {
+            const enc = new TextEncoder();
+            for (let i = 0; i < 6; i++) {
+              c.enqueue(enc.encode(': OPENROUTER PROCESSING\n\n'));
+              await new Promise((r) => setTimeout(r, 15));
+            }
+            c.enqueue(enc.encode(okChunks.join('')));
+            c.close();
+          },
+        }),
+        { status: 200 },
+      );
+    const { events } = await run(slow, (ctx) => { ctx.idleMs = 40; });
+    expect(events.at(-1)?.type).toBe('finish');
   });
 });
 

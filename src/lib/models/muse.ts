@@ -1,6 +1,8 @@
 import type { ReasoningEffort } from '@/lib/config';
 import { createSseParser } from '@/lib/sse/parser';
 import { HttpError } from '@/lib/http/errors';
+import { withRetry } from '@/lib/http/retry';
+import { DEFAULT_IDLE_MS, DEFAULT_TIMEOUT_MS } from '@/lib/http/timeout';
 import type { ModelCtx, Stage } from './types';
 import { ToolCallAccumulator, type CompleteToolCall, type InvalidToolCall } from './toolcall-accumulator';
 
@@ -50,6 +52,21 @@ function parseChunk(payload: string): Chunk {
   }
 }
 
+async function readWithIdle(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  ms: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stalled = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new DOMException('The model stream stalled', 'TimeoutError')), ms);
+  });
+  try {
+    return await Promise.race([reader.read(), stalled]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 export async function* streamMuse(
@@ -71,22 +88,36 @@ export async function* streamMuse(
   let error: string | undefined;
   const acc = new ToolCallAccumulator();
 
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
-    const res = await ctx.fetchImpl(`${ctx.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${ctx.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: ctx.signal,
-    });
-    status = res.status;
-    if (!res.ok) throw new HttpError(status, await res.text());
+    // Opening the request is safe to retry (nothing has been yielded); streaming is never retried.
+    const res = await withRetry(async () => {
+      const headerTimeout = new AbortController();
+      const timer = setTimeout(
+        () => headerTimeout.abort(new DOMException('Timed out waiting for the model to respond', 'TimeoutError')),
+        ctx.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      );
+      try {
+        const r = await ctx.fetchImpl(`${ctx.baseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${ctx.apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: ctx.signal ? AbortSignal.any([ctx.signal, headerTimeout.signal]) : headerTimeout.signal,
+        });
+        status = r.status;
+        if (!r.ok) throw new HttpError(r.status, await r.text());
+        return r;
+      } finally {
+        clearTimeout(timer); // headers are in (or we failed); the body is bounded by the idle timeout below
+      }
+    }, ctx.retry ?? { retries: 2, baseMs: 400 });
     if (!res.body) throw new Error('The model returned no response body');
 
     const parser = createSseParser();
-    const reader = res.body.getReader();
+    reader = res.body.getReader();
     let finished = false;
     while (!finished) {
-      const { value, done } = await reader.read();
+      const { value, done } = await readWithIdle(reader, ctx.idleMs ?? DEFAULT_IDLE_MS);
       if (done) break;
       for (const payload of parser.push(value)) {
         if (payload === '[DONE]') {
@@ -139,6 +170,7 @@ export async function* streamMuse(
     error = e instanceof Error ? e.message : String(e);
     throw e;
   } finally {
+    await reader?.cancel().catch(() => {}); // release the connection on error paths too
     try {
       await ctx.record({
         stage,

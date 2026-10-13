@@ -20,6 +20,7 @@ describe('loadConfig', () => {
     expect(c.scoring.maxRounds).toBe(3);
     expect(c.reasoning).toEqual({ plan: 'minimal', report: 'low' });
     expect(c.report.maxTokens).toBe(8000);
+    expect(c.retry).toEqual({ retries: 1, baseMs: 400, museRetries: 2 });
     expect(c.maxFunctionMs).toBe(MAX_DURATION_SECONDS * 1000);
     expect(c.maxRunMs).toBeLessThan(c.maxFunctionMs);
   });

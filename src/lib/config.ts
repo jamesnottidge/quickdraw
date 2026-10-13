@@ -30,7 +30,7 @@ export interface AppConfig {
   };
   search: { maxResultsPerQuery: number };
   report: { maxTokens: number };
-  retry: { retries: number; baseMs: number };
+  retry: { retries: number; baseMs: number; museRetries: number };
   maxRunMs: number;
   maxFunctionMs: number;
   reaperMarginMs: number;
@@ -89,7 +89,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     search: { maxResultsPerQuery: 6 },
     report: { maxTokens: 8000 },
-    retry: { retries: 1, baseMs: 400 },
+    retry: { retries: 1, baseMs: 400, museRetries: 2 },
     maxRunMs: 270_000,
     maxFunctionMs: MAX_DURATION_SECONDS * 1000,
     reaperMarginMs: 60_000,

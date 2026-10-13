@@ -40,6 +40,7 @@ export function buildPipelineDeps(i: {
     baseUrl: 'https://openrouter.ai/api',
     fetchImpl: fetch,
     signal,
+    retry: { retries: config.retry.museRetries, baseMs: config.retry.baseMs },
     record: async (rec) => {
       meter.add(rec.costUsd);
       await insertModelCall(db, runId, rec);

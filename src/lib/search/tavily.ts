@@ -1,10 +1,12 @@
 import { HttpError } from '@/lib/http/errors';
+import { withTimeout } from '@/lib/http/timeout';
 import type { SearchBackend, SearchResult } from './types';
 
 interface TavilyOpts {
   apiKey: string;
   fetchImpl?: typeof fetch;
   baseUrl?: string;
+  timeoutMs?: number;
 }
 
 export function createTavilySearch(opts: TavilyOpts): SearchBackend {
@@ -24,7 +26,7 @@ export function createTavilySearch(opts: TavilyOpts): SearchBackend {
           include_raw_content: false,
           include_images: false,
         }),
-        signal,
+        signal: withTimeout(signal, opts.timeoutMs ?? 15_000),
       });
       const text = await res.text();
       if (!res.ok) throw new HttpError(res.status, text);

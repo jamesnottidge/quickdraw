@@ -1,5 +1,6 @@
 import type { ModelCtx, Stage } from '@/lib/models/types';
 import { HttpError } from './errors';
+import { DEFAULT_TIMEOUT_MS, withTimeout } from './timeout';
 
 export interface PostJsonOpts {
   ctx: ModelCtx;
@@ -20,7 +21,7 @@ export async function postJson<T>(o: PostJsonOpts): Promise<T> {
       method: 'POST',
       headers: { Authorization: `Bearer ${o.ctx.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(o.body),
-      signal: o.ctx.signal,
+      signal: withTimeout(o.ctx.signal, o.ctx.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     });
     status = res.status;
     text = await res.text();

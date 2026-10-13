@@ -55,3 +55,9 @@ export function testCtx(handler: Handler) {
   };
   return { ctx, calls, records };
 }
+
+/** A fetch that never answers until its signal aborts, then rejects with the signal's reason (like undici). */
+export const hang = (_url: string, init: RequestInit): Promise<Response> =>
+  new Promise((_resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true });
+  });
