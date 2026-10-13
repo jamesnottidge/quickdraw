@@ -1,6 +1,6 @@
 'use client';
 
-import { Message, MessageContent, MessageStack } from '@/components/nexus-ui/message';
+import { Message, MessageContent, MessageStack } from './chat-message';
 import { Thread, ThreadContent, ThreadScrollToBottom } from '@/components/nexus-ui/thread';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { RunView } from '@/lib/events/reducer';

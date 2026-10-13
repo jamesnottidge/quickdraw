@@ -4,7 +4,7 @@ const modules: Record<string, string[]> = {
   '@/components/nexus-ui/prompt-input': ['PromptInput', 'PromptInputTextarea', 'PromptInputActions', 'PromptInputActionGroup', 'PromptInputAction'],
   '@/components/nexus-ui/suggestions': ['Suggestions', 'SuggestionList', 'Suggestion'],
   '@/components/nexus-ui/thread': ['Thread', 'ThreadContent', 'ThreadScrollToBottom'],
-  '@/components/nexus-ui/message': ['Message', 'MessageStack', 'MessageContent'],
+  '@/components/chat-message': ['Message', 'MessageStack', 'MessageContent'],
   '@/components/nexus-ui/chain-of-thought': ['ChainOfThought', 'ChainOfThoughtTrigger', 'ChainOfThoughtContent', 'ChainOfThoughtStep', 'ChainOfThoughtStepTitle', 'ChainOfThoughtStepContent', 'ChainOfThoughtComplete'],
   '@/components/nexus-ui/citation': ['Citation', 'CitationTrigger', 'CitationContent', 'CitationItem'],
   '@/components/nexus-ui/text-shimmer': ['TextShimmer'],

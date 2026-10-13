@@ -98,7 +98,7 @@ const modules: Record<string, string[]> = {
   '@/components/nexus-ui/prompt-input': ['PromptInput', 'PromptInputTextarea', 'PromptInputActions', 'PromptInputActionGroup', 'PromptInputAction'],
   '@/components/nexus-ui/suggestions': ['Suggestions', 'SuggestionList', 'Suggestion'],
   '@/components/nexus-ui/thread': ['Thread', 'ThreadContent', 'ThreadScrollToBottom'],
-  '@/components/nexus-ui/message': ['Message', 'MessageStack', 'MessageContent'],
+  '@/components/chat-message': ['Message', 'MessageStack', 'MessageContent'],
   '@/components/nexus-ui/chain-of-thought': ['ChainOfThought', 'ChainOfThoughtTrigger', 'ChainOfThoughtContent', 'ChainOfThoughtStep', 'ChainOfThoughtStepTitle', 'ChainOfThoughtStepContent', 'ChainOfThoughtComplete'],
   '@/components/nexus-ui/citation': ['Citation', 'CitationTrigger', 'CitationContent', 'CitationItem'],
   '@/components/nexus-ui/text-shimmer': ['TextShimmer'],
@@ -3031,7 +3031,7 @@ export function RunActions({
 ```tsx
 'use client';
 
-import { Message, MessageContent, MessageStack } from '@/components/nexus-ui/message';
+import { Message, MessageContent, MessageStack } from './chat-message';
 import { Thread, ThreadContent, ThreadScrollToBottom } from '@/components/nexus-ui/thread';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { RunView } from '@/lib/events/reducer';
@@ -4374,3 +4374,6 @@ Expected: everything PASSES.
 git add -A
 git commit -m "feat: add benchmarked comparison speeds, a live artifact check and docs"
 ```
+
+
+> **Final-pass amendment:** the Nexus `message` and `codeblock` components pulled in `streamdown` (mermaid, katex, shiki) and added ~1.7 MB of unused client JavaScript. They were replaced by `src/components/chat-message.tsx` (same layout classes), the `streamdown` packages were removed, and `tests/ui/bundle-guard.test.ts` guards against their return.
