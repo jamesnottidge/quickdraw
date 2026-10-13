@@ -1,6 +1,6 @@
 import type { ModelCallRecord } from '@/lib/models/types';
 import type { Db } from './db';
-import { jsonParam } from './util';
+import { compactForStorage, jsonParam } from './util';
 
 export async function insertModelCall(db: Db, runId: string, rec: ModelCallRecord): Promise<void> {
   await db.query(
@@ -10,8 +10,8 @@ export async function insertModelCall(db: Db, runId: string, rec: ModelCallRecor
       runId,
       rec.stage,
       rec.model,
-      jsonParam(rec.request),
-      jsonParam(rec.response),
+      jsonParam(compactForStorage(rec.request)),
+      jsonParam(compactForStorage(rec.response)),
       rec.httpStatus,
       Math.round(rec.latencyMs),
       rec.inputTokens,

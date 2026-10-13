@@ -124,3 +124,35 @@ describe('reconnects', () => {
     expect(await countReconnects(db)).toEqual({ total: 3, whileActive: 2 });
   });
 });
+
+describe('model call storage size (final review)', () => {
+  it('REVIEW (final): stores a redacted marker, not the full text, for very large strings', async () => {
+    const { runId } = await seedRun(db);
+    const page = 'x'.repeat(50_000);
+    const dataUrl = 'data:application/pdf;base64,' + 'A'.repeat(200_000);
+    await insertModelCall(db, runId, {
+      stage: 'summarize', model: 'm',
+      request: { messages: [{ role: 'system', content: 'short instruction' }, { role: 'user', content: page }, { role: 'user', content: [{ type: 'file', file: { file_data: dataUrl } }] }] },
+      response: { choices: [{ message: { content: 'short summary' } }] },
+      httpStatus: 200, latencyMs: 1, inputTokens: 1, outputTokens: 1, costUsd: 0,
+    });
+    const [row] = await db.query<{ request: any; response: any; size: number }>(
+      'select request, response, length(request::text) as size from model_calls where run_id = $1', [runId],
+    );
+    expect(row.size).toBeLessThan(2000);
+    expect(row.request.messages[0].content).toBe('short instruction');
+    expect(row.request.messages[1].content).toMatch(/^\[redacted 50000 chars sha256:[0-9a-f]{12}/);
+    expect(JSON.stringify(row.request)).toMatch(/redacted 200028 chars/);
+    expect(row.response.choices[0].message.content).toBe('short summary');
+  });
+
+  it('does not mutate the caller\'s object and keeps mid-sized strings (such as summaries)', async () => {
+    const { runId } = await seedRun(db);
+    const summary = 's'.repeat(5000);
+    const req = { messages: [{ role: 'user', content: summary }] };
+    await insertModelCall(db, runId, { stage: 'report', model: 'm', request: req, response: {}, httpStatus: 200, latencyMs: 1, inputTokens: 1, outputTokens: 1, costUsd: 0 });
+    expect(req.messages[0].content).toBe(summary);
+    const [row] = await db.query<{ request: any }>('select request from model_calls where run_id = $1', [runId]);
+    expect(row.request.messages[0].content).toBe(summary);
+  });
+});
