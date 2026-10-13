@@ -55,6 +55,19 @@ document.getElementById('toggle').addEventListener('click', function () {
 export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
   const config = loadConfig({});
   const meter = opts.meter ?? new CostMeter();
+  const rec = async (
+    stage: ModelCallRecord['stage'],
+    model: string,
+    inputTokens: number,
+    outputTokens: number,
+    costUsd: number,
+    latencyMs: number,
+  ) => {
+    await opts.record?.({
+      stage, model, request: { fake: true }, response: { fake: true },
+      httpStatus: 200, latencyMs, inputTokens, outputTokens, costUsd,
+    });
+  };
   const delay = async () => {
     if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs));
     if (opts.signal?.aborted) throw new Error('aborted');
@@ -87,6 +100,7 @@ export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
               queries: ['legal RAG chunking strategies retrieval quality', 'section-aware chunking contracts recall'],
             });
           }
+          await rec('plan', config.models.planner, 900, 120, 0.0002, 1800);
           yield FINISH_TOOLS;
         } else if (req.messages[0]?.role === 'system' && req.messages[0].content === ARTIFACT_SYSTEM) {
           const out = opts.failArtifact ? 'Sorry, I could not build that.' : FAKE_ARTIFACT_HTML;
@@ -94,18 +108,21 @@ export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
             await delay();
             yield { type: 'text', delta: part };
           }
+          await rec('artifact', config.models.planner, 2600, 6500, 0.0014, 38000);
           yield FINISH_STOP;
         } else {
           for (const part of REPORT_TEXT.match(/[\s\S]{1,24}/g) ?? []) {
             await delay();
             yield { type: 'text', delta: part };
           }
+          await rec('report', config.models.planner, 4200, 1500, 0.0005, 12000);
           yield FINISH_STOP;
         }
       })(),
     scoreQuery: async (q) => {
       await delay();
       meter.add(0.00001);
+      await rec('score_query', config.models.classify, 330, 1, 0.0000132, 900);
       const score = q === 'ai' ? 0.4 : 2.8;
       return { query: q, score, confidence: 0.9, band: score < 1.5 ? 'vague' : 'precise' };
     },
@@ -140,11 +157,13 @@ export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
     judgeRelevance: async (_q, text) => {
       await delay();
       meter.add(0.00002);
+      await rec('judge_relevance', config.models.classify, 2400, 1, 0.000096, 1100);
       return text.startsWith('OFFTOPIC') ? { relevance: 0.05, relevant: false } : { relevance: 0.92, relevant: true };
     },
     summarize: async (input) => {
       await delay();
       meter.add(0.00004);
+      await rec('summarize', config.models.summarize, 2600, 180, 0.0000361, 6000);
       return { text: `Summary: ${(input.text ?? 'document').slice(0, 60)}`, costUsd: 0.00004 };
     },
     recordPage: async () => {},
@@ -152,6 +171,7 @@ export function createFakeDeps(opts: FakeOptions = {}): PipelineDeps {
       await delay();
       if (opts.failTldr) throw new Error('tldr unavailable');
       meter.add(0.00002);
+      await rec('tldr', config.models.extract, 1500, 90, 0.0000236, 2500);
       return { text: 'Section-aware chunking helps legal RAG retrieve whole clauses with their context.', costUsd: 0.00002 };
     },
   };

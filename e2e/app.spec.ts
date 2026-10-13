@@ -1,5 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 
+// Every test runs from its own "IP": the app limits runs per IP (3x the per-device limit), and one shared
+// address would run out of quota halfway through the suite.
+test.beforeEach(async ({ context }) => {
+  const octet = () => 1 + Math.floor(Math.random() * 250);
+  await context.setExtraHTTPHeaders({ 'x-forwarded-for': `203.${octet()}.${octet()}.${octet()}` });
+});
+
 /** Starts a run from the page's own session and returns its id without reading the stream. */
 async function startRunId(page: Page, prompt: string): Promise<string> {
   const id = await page.evaluate(async (p) => {
@@ -201,5 +208,33 @@ test.describe('canvas on a phone', () => {
     await page.getByRole('button', { name: 'Send' }).click();
     const sheet = page.getByRole('dialog');
     await expect(sheet.getByRole('heading', { name: 'Chunking for legal RAG' })).toBeVisible({ timeout: 30_000 });
+  });
+});
+
+test.describe('comparison', () => {
+  test('compare cost and speed opens a table with the harness actuals and estimates', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('comparison modal test run');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('button', { name: 'Compare cost and speed' }).click({ timeout: 40_000 });
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Cost and speed comparison' })).toBeVisible();
+    const harness = dialog.getByRole('row', { name: /This harness/ });
+    await expect(harness).toBeVisible();
+    await expect(harness.getByText('Actual')).toBeVisible();
+    await expect(dialog.getByRole('row', { name: /Claude Sonnet 5.5/ }).getByText('Estimate')).toBeVisible();
+
+    await dialog.getByRole('button', { name: 'How this is estimated' }).click();
+    await expect(dialog.getByText(/20 output tokens/)).toBeVisible();
+    await expect(dialog.getByText(/quality is not compared/i)).toBeVisible();
+  });
+
+  test('is only offered once the run has finished', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('comparison availability test run');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText('Researching…').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Compare cost and speed' })).toHaveCount(0);
   });
 });

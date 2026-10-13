@@ -31,6 +31,7 @@ export function buildPipelineDeps(i: {
       meter: i.meter,
       signal: i.signal,
       delayMs: Number(process.env.FAKE_DELAY_MS ?? 0),
+      record: (rec) => insertModelCall(i.db, i.runId, rec),
     });
   }
 

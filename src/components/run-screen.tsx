@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import type { RunView } from '@/lib/events/reducer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCanvas } from '@/hooks/useCanvas';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { CanvasPanel } from './canvas-panel';
+import { ComparisonDialog } from './comparison-dialog';
 import { RunThread } from './run-thread';
 import { SplitLayout } from './split-layout';
 
@@ -17,10 +19,12 @@ export interface CanvasController {
   setTab(tab: CanvasTab): void;
 }
 
-export function RunScreen({ view }: { view: RunView; runId: string | null }) {
+export function RunScreen({ view, runId }: { view: RunView; runId: string | null }) {
   const isMobile = useIsMobile();
   const canvas = useCanvas(view);
-  const thread = <RunThread view={view} canvas={canvas} />;
+  const [compareOpen, setCompareOpen] = useState(false);
+  const thread = <RunThread view={view} canvas={canvas} onCompare={runId ? () => setCompareOpen(true) : undefined} />;
+  const dialog = runId ? <ComparisonDialog runId={runId} open={compareOpen} onOpenChange={setCompareOpen} /> : null;
   const panel = view.reportDone ? <CanvasPanel view={view} canvas={canvas} /> : null;
 
   if (isMobile) {
@@ -33,8 +37,14 @@ export function RunScreen({ view }: { view: RunView; runId: string | null }) {
             {panel}
           </SheetContent>
         </Sheet>
+        {dialog}
       </div>
     );
   }
-  return <SplitLayout left={thread} right={canvas.open ? panel : null} />;
+  return (
+    <>
+      <SplitLayout left={thread} right={canvas.open ? panel : null} />
+      {dialog}
+    </>
+  );
 }

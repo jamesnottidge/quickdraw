@@ -2235,6 +2235,13 @@ describe('truncate', () => {
 ```ts
 import { test, expect, type Page } from '@playwright/test';
 
+// Every test runs from its own "IP": the app limits runs per IP (3x the per-device limit), and one shared
+// address would run out of quota halfway through the suite.
+test.beforeEach(async ({ context }) => {
+  const octet = () => 1 + Math.floor(Math.random() * 250);
+  await context.setExtraHTTPHeaders({ 'x-forwarded-for': `203.${octet()}.${octet()}.${octet()}` });
+});
+
 /** Starts a run from the page's own session and returns its id without reading the stream. */
 async function startRunId(page: Page, prompt: string): Promise<string> {
   const id = await page.evaluate(async (p) => {
@@ -3956,7 +3963,8 @@ import type { ComparisonResult } from '@/lib/comparison/types';
 import { formatDuration, formatRatio, formatUsd } from '@/lib/ui/format';
 
 type State =
-  | { status: 'idle' | 'loading' }
+  | { status: 'idle' }
+  | { status: 'loading' }
   | { status: 'ready'; data: ComparisonResult }
   | { status: 'error'; message: string };
 
