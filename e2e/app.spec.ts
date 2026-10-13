@@ -307,6 +307,7 @@ test.describe('new research', () => {
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText(/Research complete/).first()).toBeVisible({ timeout: 40_000 });
 
+    await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click(); // closed when research started
     await page.getByRole('link', { name: 'New research', exact: true }).click();
     await expect(page.getByRole('heading', { name: /What do you want researched/i })).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
@@ -318,6 +319,7 @@ test.describe('new research', () => {
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText('Researching…').first()).toBeVisible();
 
+    await page.getByRole('button', { name: 'Toggle Sidebar' }).first().click(); // closed when research started
     await page.getByRole('link', { name: 'New research', exact: true }).click();
     await expect(page.getByRole('heading', { name: /What do you want researched/i })).toBeVisible();
 
