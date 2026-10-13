@@ -153,14 +153,14 @@ export function ResearchTimeline({ view }: { view: RunView }) {
   const base = view.status === 'finished' ? 'Research complete' : view.status === 'idle' ? 'Research' : 'Research stopped';
   const label = `${base} · ${steps.length} steps`;
   return (
-    <ChainOfThought defaultOpen>
+    <ChainOfThought defaultOpen autoCloseOnAllComplete={false}>
       <ChainOfThoughtTrigger>
         {running ? <TextShimmer as="span">Researching…</TextShimmer> : <span>{label}</span>}
       </ChainOfThoughtTrigger>
       <ChainOfThoughtContent>
         {steps.map((step) => {
           return (
-            <ChainOfThoughtStep key={step.key} status={step.status} hasContent={step.status !== 'pending'}>
+            <ChainOfThoughtStep key={step.key} status={step.status} autoCloseOnComplete={false} hasContent={step.status !== 'pending'}>
               {/* plain text only: an active title is shimmered, which would hide a badge's text */}
               <ChainOfThoughtStepTitle icon={<StepIcon step={step} />}>
                 <span>{step.label}</span>

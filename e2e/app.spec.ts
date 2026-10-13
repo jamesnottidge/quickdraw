@@ -190,6 +190,16 @@ test.describe('canvas', () => {
     expect(box.width / main.width).toBeLessThan(0.6);
   });
 
+  test('the research steps stay open after the run finishes', async ({ page }) => {
+    await startAndWaitForCanvas(page, 'steps stay open test run');
+    await expect(page.getByRole('button', { name: 'Compare cost and speed' })).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(500);
+    await expect(page.getByRole('button', { name: /^Research complete/ })).toHaveAttribute('aria-expanded', 'true');
+    for (const name of [/^Plan/, /^Search/, /^Read/, /^Write/, /^Interactive view/]) {
+      await expect(page.getByRole('button', { name }).first()).toHaveAttribute('aria-expanded', 'true');
+    }
+  });
+
   test('the sidebar closes when research starts', async ({ page }) => {
     await page.goto('/');
     const sidebar = page.locator('[data-slot="sidebar"][data-state]').first();
