@@ -36,7 +36,7 @@ pre{background:rgba(127,127,127,.15);padding:12px;border-radius:8px}
 <h1 id="title">Chunking for legal RAG</h1>
 <button id="toggle">Show details</button>
 <p id="details" hidden>Section-aware chunking keeps clauses and cross references together [1].</p>
-<pre id="probe">probing</pre>
+<pre id="probe" hidden>probing</pre>
 <script>
 document.getElementById('toggle').addEventListener('click', function () {
   var d = document.getElementById('details'); d.hidden = !d.hidden;
