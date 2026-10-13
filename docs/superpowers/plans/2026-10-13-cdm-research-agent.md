@@ -7419,7 +7419,8 @@ let failures = 0;
 async function check(name: string, fn: () => Promise<string>) {
   const t0 = Date.now();
   try {
-    console.log(`PASS ${name} (${Date.now() - t0} ms): ${await fn()}`);
+    const detail = await fn(); // await first: a template literal would read the clock before fn() finished
+    console.log(`PASS ${name} (${Date.now() - t0} ms): ${detail}`);
   } catch (e) {
     failures++;
     console.log(`FAIL ${name}: ${e instanceof Error ? e.message : e}`);
