@@ -66,7 +66,7 @@ export function Timeline({ view }: { view: RunView }) {
             {view.pageOrder.map((url) => {
               const p = view.pages[url];
               return (
-                <li key={url}>
+                <li key={url} className="page-row">
                   <span title={url}>{p.title || host(url)}</span>
                   <span className={`pill pill-${p.status === 'failed' ? 'failed' : p.relevant === false ? 'skipped' : 'ok'}`}>
                     {p.status === 'failed'
@@ -79,6 +79,7 @@ export function Timeline({ view }: { view: RunView }) {
                             ? 'summarizing…'
                             : 'summarized'}
                   </span>
+                  {p.summary && <p className="summary">{p.summary}</p>}
                 </li>
               );
             })}

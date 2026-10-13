@@ -111,7 +111,7 @@ Rule: nothing acts on anything incomplete. Three layers:
 
 Enforced in the route before any model call.
 
-- Per-device daily run quota (default 5, configurable). Per-IP quota about 3x. A run is blocked if either is exceeded.
+- Per-device daily run quota (default 5, configurable). Per-IP quota about 3x. A run is blocked if either is exceeded. Slots are claimed with one atomic conditional upsert per key (`quota_usage`), so a burst of simultaneous requests cannot all pass a stale count; a slot is released if the budget refuses the run or the run cannot be created.
 - Global daily spend cap: $5, a config value changeable without redeploy. At run start the route atomically reserves a worst-case cost (initial guess $0.15, tuned from measured totals) with a single conditional SQL update on the day's ledger row, so simultaneous starts cannot overshoot. On completion the reservation is replaced by actual spend summed from each response's `usage.cost`.
 - Each run row stores its reservation (`reserved_usd`, `reserved_searches`, ledger day) and a `settled` flag; settlement is idempotent. If Vercel kills a function at its time limit, the settlement never runs, so each new run first reaps stale `running` runs (older than the max function duration plus a margin): they are marked failed and their reservation is settled using the actual cost summed from `model_calls`.
 - Search-call budget tracked the same way (Tavily's allowance is 1,000 credits/month; SearXNG is expected to replace it first).
@@ -131,6 +131,9 @@ Identity: a first-visit httpOnly cookie holds a random `device_id`. The IP comes
 | `pages` | URL, fetch status, content type, extracted markdown |
 | `reconnects` | run id, session, whether the run was still active, timestamp |
 | `spend_ledger` | per UTC day: reserved and actual spend, search calls |
+| `quota_usage` | per UTC day and key (`device:<id>` / `ip:<hash>`): runs claimed |
+
+`model_calls` stores strings over 8,000 characters (fetched page text, base64 documents) as a short redacted marker with length and hash, because the page text already lives in `pages`; consequently a stored PDF/image stage cannot be replayed from the database alone. Every upstream call has a timeout (30 s; Tavily 15 s; 45 s of silence on a Muse stream), and opening a Muse request retries 429/5xx/timeouts twice. The stale-run reaper also appends a terminal `run_failed` event so a replay of a killed run shows "failed".
 
 The config snapshot records models, prompts, rubrics, `noul` criteria text, thresholds and loop caps in force for the run. `pages` retention: 90 days.
 

@@ -67,3 +67,6 @@ button.secondary, .canvas-actions button { background: transparent; color: var(-
 .markdown pre { overflow-x: auto; padding: 12px; background: var(--bg); border-radius: 8px; }
 .markdown table { border-collapse: collapse; }
 .markdown th, .markdown td { border: 1px solid var(--border); padding: 4px 8px; }
+
+.timeline .page-row { flex-wrap: wrap; }
+.timeline .summary { flex-basis: 100%; margin: 2px 0 6px; color: var(--muted); font-size: 0.85rem; }

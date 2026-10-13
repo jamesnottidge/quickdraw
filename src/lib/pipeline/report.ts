@@ -9,9 +9,10 @@ export interface ReportDeps {
   muse: (req: MuseRequest) => AsyncIterable<MuseEvent>;
 }
 
-const attr = (s: string) => s.replace(/["\n\r]/g, ' ').slice(0, 200);
 // Untrusted text must not be able to close or open our <source> delimiters.
 const defuse = (s: string) => s.replace(/<(\/?)source/gi, '‹$1source');
+// Page titles and URLs are attacker-controlled too, so they get the same treatment as summaries.
+const attr = (s: string) => defuse(s.replace(/["\n\r]/g, ' ')).slice(0, 200);
 
 export function buildReportMessages(question: string, summaries: GatheredSummary[]): MuseMessage[] {
   const sources = summaries

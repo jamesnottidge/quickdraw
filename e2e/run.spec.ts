@@ -16,6 +16,7 @@ test('streams a run live, shows the report canvas and TLDR, and replays after a 
   await expect(page.getByText('legal RAG chunking strategies retrieval quality').first()).toBeVisible();
   await expect(page.getByText(/^vague · 0\.4$/).first()).toBeVisible(); // the "ai" query scored vague
   await expect(page.getByText('HTTP 403')).toBeVisible(); // a page that could not be fetched
+  await expect(page.getByText(/^Summary: Section-aware chunking/).first()).toBeVisible(); // summaries appear as they land
 
   // finished: canvas + TLDR
   await expect(page.getByRole('heading', { name: 'Chunking for legal RAG' })).toBeVisible();
