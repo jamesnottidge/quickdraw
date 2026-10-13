@@ -20,7 +20,7 @@ function downloadHtml(html: string) {
 export function CanvasPanel({ view, canvas }: { view: RunView; canvas: CanvasController }) {
   const ready = view.artifact.status === 'ready' && !!view.artifact.html;
   return (
-    <aside aria-label="Report canvas" className="flex h-full min-h-0 flex-col border-l bg-background">
+    <aside aria-label="Report canvas" className="flex h-full min-h-0 flex-col border-l bg-sidebar text-sidebar-foreground matte">
       <Tabs value={canvas.tab} onValueChange={(t) => canvas.setTab(t as CanvasTab)} className="flex h-full min-h-0 flex-col gap-0">
         <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-3">
           <TabsList>

@@ -180,14 +180,14 @@ test.describe('canvas', () => {
     await expect(frame.locator('#probe')).toHaveText('{"cookie":"blocked","parent":"blocked","fetch":"blocked"}');
   });
 
-  test('the canvas opens at about 45% of the content width', async ({ page }) => {
+  test('the canvas opens at about 55% of the content width', async ({ page }) => {
     const canvas = await startAndWaitForCanvas(page, 'canvas width test run');
     await expect(canvas).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(500);
     const main = (await page.locator('main').boundingBox())!;
     const box = (await canvas.boundingBox())!;
-    expect(box.width / main.width).toBeGreaterThan(0.4);
-    expect(box.width / main.width).toBeLessThan(0.5);
+    expect(box.width / main.width).toBeGreaterThan(0.5);
+    expect(box.width / main.width).toBeLessThan(0.6);
   });
 
   test('the sidebar closes when research starts', async ({ page }) => {

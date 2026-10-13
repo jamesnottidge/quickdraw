@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from 'react';
 import { usePanelRef } from 'react-resizable-panels';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 
-const CANVAS_SIZE = '45%';
+const CANVAS_SIZE = '55%';
 
 /**
  * Both panels always exist and the canvas panel is collapsed rather than removed, so the thread (and any
