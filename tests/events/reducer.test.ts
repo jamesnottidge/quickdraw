@@ -106,3 +106,50 @@ describe('parseRunEvent', () => {
     expect(() => parseRunEvent({ runId: 'r', seq: 1, ts: 1, type: 'report_delta' })).toThrow();
   });
 });
+
+describe('artifact and sources events', () => {
+  const sources = [
+    { n: 1, url: 'https://a.test/1', title: 'A', snippet: 'about a' },
+    { n: 2, url: 'https://b.test/2', title: 'B', snippet: 'about b' },
+  ];
+
+  it('stores sources and walks the artifact lifecycle', () => {
+    const s1 = fold([ev(1, { type: 'run_started', prompt: 'p' }), ev(2, { type: 'sources_ready', sources })]);
+    expect(s1.sources).toEqual(sources);
+    expect(s1.artifact).toEqual({ status: 'idle' });
+
+    const s2 = applyEvent(s1, ev(3, { type: 'artifact_started' }));
+    expect(s2.artifact.status).toBe('building');
+
+    const s3 = applyEvent(s2, ev(4, { type: 'artifact_done', html: '<!doctype html><html></html>' }));
+    expect(s3.artifact).toEqual({ status: 'ready', html: '<!doctype html><html></html>' });
+  });
+
+  it('records an artifact failure with its reason without failing the run', () => {
+    const s = fold([
+      ev(1, { type: 'run_started', prompt: 'p' }),
+      ev(2, { type: 'artifact_failed', reason: 'skipped: not enough time left' }),
+      ev(3, { type: 'run_finished', costUsd: 0.01 }),
+    ]);
+    expect(s.artifact).toEqual({ status: 'failed', reason: 'skipped: not enough time left' });
+    expect(s.status).toBe('finished');
+  });
+
+  it('REVIEW FOCUS: a run recorded before this change replays with empty sources and an idle artifact', () => {
+    const s = fold([
+      ev(1, { type: 'run_started', prompt: 'old run' }),
+      ev(2, { type: 'report_done', text: 'See [1].' }),
+      ev(3, { type: 'run_finished', costUsd: 0.02 }),
+    ]);
+    expect(s.sources).toEqual([]);
+    expect(s.artifact).toEqual({ status: 'idle' });
+    expect(s.status).toBe('finished');
+  });
+
+  it('parseRunEvent accepts the new events and rejects malformed ones', () => {
+    expect(parseRunEvent(ev(1, { type: 'sources_ready', sources })).type).toBe('sources_ready');
+    expect(parseRunEvent(ev(1, { type: 'artifact_done', html: '<html></html>' })).type).toBe('artifact_done');
+    expect(() => parseRunEvent({ runId: 'r', seq: 1, ts: 1, type: 'sources_ready', sources: [{ n: 0, url: 'u', title: 't', snippet: 's' }] })).toThrow();
+    expect(() => parseRunEvent({ runId: 'r', seq: 1, ts: 1, type: 'artifact_done' })).toThrow();
+  });
+});

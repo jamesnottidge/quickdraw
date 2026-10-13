@@ -38,6 +38,20 @@ export const eventBodySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('report_delta'), text: z.string() }),
   z.object({ type: z.literal('report_done'), text: z.string() }),
   z.object({ type: z.literal('tldr_done'), text: z.string() }),
+  z.object({
+    type: z.literal('sources_ready'),
+    sources: z.array(
+      z.object({
+        n: z.number().int().positive(),
+        url: z.string(),
+        title: z.string(),
+        snippet: z.string(),
+      }),
+    ),
+  }),
+  z.object({ type: z.literal('artifact_started') }),
+  z.object({ type: z.literal('artifact_done'), html: z.string() }),
+  z.object({ type: z.literal('artifact_failed'), reason: z.string() }),
   z.object({ type: z.literal('run_finished'), costUsd: z.number() }),
   z.object({ type: z.literal('run_failed'), message: z.string() }),
 ]);

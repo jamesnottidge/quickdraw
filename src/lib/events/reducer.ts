@@ -17,6 +17,19 @@ export interface RoundView {
   scores: Record<string, { score: number; band: string; confidence: number }>;
 }
 
+export interface SourceView {
+  n: number;
+  url: string;
+  title: string;
+  snippet: string;
+}
+
+export interface ArtifactView {
+  status: 'idle' | 'building' | 'ready' | 'failed';
+  html?: string;
+  reason?: string;
+}
+
 export interface RunView {
   status: 'idle' | 'running' | 'finished' | 'failed' | 'interrupted';
   lastSeq: number;
@@ -32,6 +45,8 @@ export interface RunView {
   tldr: string | null;
   costUsd: number | null;
   error: string | null;
+  sources: SourceView[];
+  artifact: ArtifactView;
 }
 
 export const initialRunView: RunView = {
@@ -49,6 +64,8 @@ export const initialRunView: RunView = {
   tldr: null,
   costUsd: null,
   error: null,
+  sources: [],
+  artifact: { status: 'idle' },
 };
 
 function upsertRound(rounds: RoundView[], round: number, fn: (r: RoundView) => RoundView): RoundView[] {
@@ -126,6 +143,14 @@ export function applyEvent(state: RunView, ev: RunEvent): RunView {
       return { ...base, report: ev.text, reportDone: true };
     case 'tldr_done':
       return { ...base, tldr: ev.text };
+    case 'sources_ready':
+      return { ...base, sources: ev.sources };
+    case 'artifact_started':
+      return { ...base, artifact: { status: 'building' } };
+    case 'artifact_done':
+      return { ...base, artifact: { status: 'ready', html: ev.html } };
+    case 'artifact_failed':
+      return { ...base, artifact: { status: 'failed', reason: ev.reason } };
     case 'run_finished':
       return { ...base, status: 'finished', costUsd: ev.costUsd };
     case 'run_failed':
