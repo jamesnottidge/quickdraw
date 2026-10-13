@@ -101,7 +101,7 @@ Rule: nothing acts on anything incomplete. Three layers:
 
 **Transport (SSE).** Each SSE frame is one complete JSON event. The client parser buffers until the blank line terminating a frame, since network chunks do not align with frames, and decodes with a streaming `TextDecoder` so multi-byte characters split across chunks are not corrupted.
 
-**LLM tool calls.** Muse tool-call arguments arrive as fragments (Vercel AI SDK: `input-streaming`, `input-available`, `output-available`). Tools run only at `input-available`. The UI may show a "drafting queries" state during `input-streaming`, which is display only. Malformed or truncated arguments never execute; they become a tool error. **Muse tool-call streaming has not been tested; a small test is the first implementation task.**
+**LLM tool calls.** Muse tool-call arguments arrive as fragments in OpenRouter's OpenAI-compatible SSE stream (`delta.tool_calls[].function.arguments`). We parse that stream ourselves with a small accumulator (not the Vercel AI SDK, whose v7 stream API was changed and could not be verified; this keeps the partial-call rule in our own tested code). Fragments are assembled per tool-call index, and a call is surfaced as complete only when the stream finishes and its arguments parse as JSON. Tools run only for complete calls. The UI may show a "drafting queries" state while arguments stream, which is display only. Malformed or truncated arguments never execute; they become a tool error returned to the model. **Muse tool-call streaming has not been tested against the real API; capturing a real stream as a test fixture is the first implementation task.**
 
 **Event stream.** Every event carries `{runId, seq, ts, type}`. The client reducer applies events in `seq` order and ignores duplicates and replays. Every run ends with `run_finished` or `run_failed`; a stream that ends without one is shown as "interrupted", never "done".
 
@@ -113,6 +113,7 @@ Enforced in the route before any model call.
 
 - Per-device daily run quota (default 5, configurable). Per-IP quota about 3x. A run is blocked if either is exceeded.
 - Global daily spend cap: $5, a config value changeable without redeploy. At run start the route atomically reserves a worst-case cost (initial guess $0.15, tuned from measured totals) with a single conditional SQL update on the day's ledger row, so simultaneous starts cannot overshoot. On completion the reservation is replaced by actual spend summed from each response's `usage.cost`.
+- Each run row stores its reservation (`reserved_usd`, `reserved_searches`, ledger day) and a `settled` flag; settlement is idempotent. If Vercel kills a function at its time limit, the settlement never runs, so each new run first reaps stale `running` runs (older than the max function duration plus a margin): they are marked failed and their reservation is settled using the actual cost summed from `model_calls`.
 - Search-call budget tracked the same way (Tavily's allowance is 1,000 credits/month; SearXNG is expected to replace it first).
 - Per-run hard limits: 8 queries, 30 pages, 200k characters per page, maximum report length, overall wall clock set from the confirmed Vercel plan duration (to be checked).
 - Limit hits return a plain message; nothing is spent.
@@ -201,7 +202,7 @@ When a client opens a run that is still in progress, the app serves the stored e
 
 ## 12. Open items for the first implementation tasks
 
-1. Test Muse tool-call streaming and the AI SDK tool lifecycle against `meta/muse-spark-1.3-contributor`.
+1. Capture a real Muse tool-call SSE stream as a fixture and verify the accumulator against it.
 2. Confirm the Vercel plan's maximum function duration and set the per-run wall-clock limit from it.
 3. Tune the classify rubrics (query specificity, page relevance) and the worst-case cost reservation from measured runs.
 4. Confirm Tavily's free-credit allowance and set the search budget.
