@@ -226,18 +226,16 @@ test.describe('canvas', () => {
     const canvas = await startAndWaitForCanvas(page, 'thread state test run');
     await expect(canvas).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Compare cost and speed' })).toBeVisible({ timeout: 30_000 }); // run finished
-    const all = page.getByRole('button', { name: /^Research complete/ });
-    if ((await all.getAttribute('aria-expanded')) !== 'true') await all.click(); // it folds itself once every step is done
     const step = page.getByRole('button', { name: /^Plan/ });
-    await step.click();
-    await expect(step).toHaveAttribute('aria-expanded', 'true');
+    await step.click(); // steps start open; folding one is the visitor's own state
+    await expect(step).toHaveAttribute('aria-expanded', 'false');
 
     await page.getByRole('button', { name: 'Collapse canvas' }).click();
     await expect(canvas).toHaveCount(0);
-    await expect(step).toHaveAttribute('aria-expanded', 'true');
+    await expect(step).toHaveAttribute('aria-expanded', 'false');
     await page.getByRole('button', { name: 'Open report' }).click();
     await expect(canvas).toBeVisible();
-    await expect(step).toHaveAttribute('aria-expanded', 'true');
+    await expect(step).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('REVIEW (final): hovering a citation loads nothing from third-party sites', async ({ page }) => {
