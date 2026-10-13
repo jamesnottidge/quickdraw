@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { applyEvent, initialRunView, markStreamEnded, type RunView } from '@/lib/events/reducer';
 import type { RunEvent } from '@/lib/events/schema';
 import { consumeEventStream } from '@/lib/sse/consume';
@@ -30,8 +30,15 @@ export function useRunStream() {
   const [rejected, setRejected] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Leaving the page stops listening; the run itself carries on (and finishes) on the server.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const start = useCallback(async (prompt: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setRejected(null);
     setRunId(null);
     setStarting(true);
@@ -41,6 +48,7 @@ export function useRunStream() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ prompt }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => null);
@@ -62,6 +70,7 @@ export function useRunStream() {
   }, []);
 
   const reset = useCallback(() => {
+    abortRef.current?.abort();
     dispatch({ kind: 'reset' });
     setRejected(null);
     setRunId(null);

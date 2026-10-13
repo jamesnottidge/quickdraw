@@ -24,7 +24,7 @@ async function startRunId(page: Page, prompt: string): Promise<string> {
 test.describe('app shell', () => {
   test('lists this browser\'s sessions in the sidebar and opens one', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'New research' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'New research', exact: true })).toBeVisible();
     const id = await startRunId(page, 'sidebar session test');
     await page.reload();
     const item = page.getByRole('link', { name: /sidebar session test/ });
@@ -236,5 +236,31 @@ test.describe('comparison', () => {
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText('Researching…').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Compare cost and speed' })).toHaveCount(0);
+  });
+});
+
+test.describe('new research', () => {
+  test('REVIEW (final): New research leaves a run that was started from the home page', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('new research navigation test');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText(/Research complete/).first()).toBeVisible({ timeout: 40_000 });
+
+    await page.getByRole('link', { name: 'New research', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /What do you want researched/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('also leaves a run that is still in progress, and the run can be reopened from the sidebar', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('leave a live run test');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText('Researching…').first()).toBeVisible();
+
+    await page.getByRole('link', { name: 'New research', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /What do you want researched/i })).toBeVisible();
+
+    await page.getByRole('link', { name: /leave a live run test/ }).click();
+    await expect(page.getByText(/Research complete/).first()).toBeVisible({ timeout: 40_000 });
   });
 });
