@@ -81,3 +81,44 @@ test.describe('run view', () => {
     await expect(page.getByRole('alert').filter({ hasText: /doesn.t exist/ })).toBeVisible();
   });
 });
+
+test.describe('home', () => {
+  test('shows the prompt, fills it from a suggestion, and streams a run live', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: /What do you want researched/i })).toBeVisible();
+
+    const suggestion = page.getByRole('button', { name: /chunking strategies affect retrieval quality/i });
+    await suggestion.click();
+    const box = page.getByRole('textbox');
+    await expect(box).toHaveValue(/chunking strategies/);
+
+    await page.getByRole('button', { name: 'Send' }).click();
+
+    // live progress arrives before the run finishes
+    await expect(page.getByText('Researching…').first()).toBeVisible();
+    await expect(page.getByText(/Section-aware chunking helps legal RAG retrieve whole clauses/)).toBeVisible();
+    await expect(page).toHaveURL(/\/run\/[0-9a-f-]{36}$/);
+
+    // the new session shows up in the sidebar
+    await expect(page.getByRole('link', { name: /chunking strategies affect retrieval quality/i }).first()).toBeVisible();
+  });
+
+  test('will not submit a prompt that is too short', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('textbox').fill('hi');
+    await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
+  });
+
+  test('blocks a device after its daily quota with a clear message', async ({ page }) => {
+    for (let i = 0; i < 2; i++) {
+      await page.goto('/');
+      await page.getByRole('textbox').fill(`quota test run number ${i}`);
+      await page.getByRole('button', { name: 'Send' }).click();
+      await expect(page.getByText(/Research complete/).first()).toBeVisible({ timeout: 30_000 });
+    }
+    await page.goto('/');
+    await page.getByRole('textbox').fill('quota test run number three');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: /tomorrow/i })).toBeVisible();
+  });
+});

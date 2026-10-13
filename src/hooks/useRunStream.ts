@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useState } from 'react';
 import { applyEvent, initialRunView, markStreamEnded, type RunView } from '@/lib/events/reducer';
 import type { RunEvent } from '@/lib/events/schema';
 import { consumeEventStream } from '@/lib/sse/consume';
+import { SESSIONS_REFRESH } from './useSessions';
 
 type Action =
   | { kind: 'event'; ev: RunEvent }
@@ -49,12 +50,14 @@ export function useRunStream() {
       const id = res.headers.get('x-run-id');
       setRunId(id);
       if (id) window.history.replaceState(null, '', `/run/${id}`);
+      window.dispatchEvent(new Event(SESSIONS_REFRESH));
       await consumeEventStream(res.body, (ev) => dispatch({ kind: 'event', ev }));
     } catch {
       /* a dropped connection is reported by markStreamEnded below, never as success */
     } finally {
       dispatch({ kind: 'ended' });
       setStarting(false);
+      window.dispatchEvent(new Event(SESSIONS_REFRESH));
     }
   }, []);
 
