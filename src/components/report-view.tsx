@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Citation, CitationContent, CitationItem, CitationTrigger } from '@/components/nexus-ui/citation';
 import type { RunView, SourceView } from '@/lib/events/reducer';
 import { remarkCitations } from '@/lib/report/citations';
-import { stripSourcesSection } from '@/lib/report/sources';
+import { domainOf, stripSourcesSection } from '@/lib/report/sources';
 import { SourcesList } from './sources-list';
 
 function CitationChip({ n, sources }: { n: number; sources: SourceView[] }) {
@@ -16,7 +16,11 @@ function CitationChip({ n, sources }: { n: number; sources: SourceView[] }) {
     <Citation citations={[{ url: source.url, title: source.title, description: source.snippet }]}>
       <CitationTrigger label={String(n)} showFavicon={false} className="mx-0.5 h-5 px-1.5 py-0 align-[0.15em]" />
       <CitationContent>
-        <CitationItem />
+        <CitationItem showSource={false}>
+          <h4 className="line-clamp-2 text-xs leading-4 font-[450] text-primary">{source.title}</h4>
+          {source.snippet && <p className="line-clamp-3 text-xs leading-4.5 font-[350] text-muted-foreground">{source.snippet}</p>}
+          <span className="text-xs text-muted-foreground">{domainOf(source.url)}</span>
+        </CitationItem>
       </CitationContent>
     </Citation>
   );

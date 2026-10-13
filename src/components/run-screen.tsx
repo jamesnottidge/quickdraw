@@ -43,7 +43,7 @@ export function RunScreen({ view, runId }: { view: RunView; runId: string | null
   }
   return (
     <>
-      <SplitLayout left={thread} right={canvas.open ? panel : null} />
+      <SplitLayout left={thread} right={panel} open={canvas.open && !!panel} onOpenChange={canvas.setOpen} />
       {dialog}
     </>
   );

@@ -180,6 +180,48 @@ test.describe('canvas', () => {
     await expect(frame.locator('#probe')).toHaveText('{"cookie":"blocked","parent":"blocked","fetch":"blocked"}');
   });
 
+  test('REVIEW (final): the interactive view keeps its state when switching tabs and back', async ({ page }) => {
+    const canvas = await startAndWaitForCanvas(page, 'tab state test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await canvas.getByRole('tab', { name: /Interactive view/ }).click();
+    const frame = page.frameLocator('iframe[title="Interactive view"]');
+    await frame.getByRole('button', { name: 'Show details' }).click();
+    await expect(frame.getByText(/Section-aware chunking keeps clauses/)).toBeVisible();
+
+    await canvas.getByRole('tab', { name: 'Report' }).click();
+    await canvas.getByRole('tab', { name: /Interactive view/ }).click();
+    await expect(frame.getByText(/Section-aware chunking keeps clauses/)).toBeVisible();
+  });
+
+  test('REVIEW (final): collapsing and reopening the canvas does not reset the thread', async ({ page }) => {
+    const canvas = await startAndWaitForCanvas(page, 'thread state test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Compare cost and speed' })).toBeVisible({ timeout: 30_000 }); // run finished
+    const all = page.getByRole('button', { name: /^Research complete/ });
+    if ((await all.getAttribute('aria-expanded')) !== 'true') await all.click(); // it folds itself once every step is done
+    const step = page.getByRole('button', { name: /^Plan/ });
+    await step.click();
+    await expect(step).toHaveAttribute('aria-expanded', 'true');
+
+    await page.getByRole('button', { name: 'Collapse canvas' }).click();
+    await expect(canvas).toHaveCount(0);
+    await expect(step).toHaveAttribute('aria-expanded', 'true');
+    await page.getByRole('button', { name: 'Open report' }).click();
+    await expect(canvas).toBeVisible();
+    await expect(step).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('REVIEW (final): hovering a citation loads nothing from third-party sites', async ({ page }) => {
+    const external: string[] = [];
+    page.on('request', (r) => { if (!r.url().startsWith('http://localhost')) external.push(r.url()); });
+    const canvas = await startAndWaitForCanvas(page, 'citation privacy test run');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    await canvas.locator('article').getByText('1', { exact: true }).first().hover();
+    await expect(page.getByText('example.test').first()).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(external.filter((u) => !u.startsWith('data:'))).toEqual([]);
+  });
+
   test('REVIEW FOCUS: a run recorded before artifacts existed still opens, with plain markers and no interactive content', async ({ page }) => {
     const id = '11111111-1111-4111-8111-111111111111';
     const events = [

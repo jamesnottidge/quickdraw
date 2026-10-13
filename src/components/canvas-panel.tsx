@@ -42,10 +42,10 @@ export function CanvasPanel({ view, canvas }: { view: RunView; canvas: CanvasCon
             </Button>
           </div>
         </header>
-        <TabsContent value="report" className="min-h-0 flex-1 overflow-y-auto">
+        <TabsContent value="report" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
           <ReportView view={view} />
         </TabsContent>
-        <TabsContent value="interactive" className="min-h-0 flex-1">
+        <TabsContent value="interactive" forceMount className="min-h-0 flex-1 data-[state=inactive]:hidden">
           <ArtifactPane artifact={view.artifact} />
         </TabsContent>
       </Tabs>
