@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelRightClose } from 'lucide-react';
+import { Download, PanelRightClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { RunView } from '@/lib/events/reducer';
@@ -32,8 +32,9 @@ export function CanvasPanel({ view, canvas }: { view: RunView; canvas: CanvasCon
           </TabsList>
           <div className="flex items-center gap-1">
             {canvas.tab === 'interactive' && ready && (
-              <Button variant="ghost" size="sm" onClick={() => downloadHtml(view.artifact.html!)}>
-                Download .html
+              <Button variant="ghost" size="sm" aria-label="Download .html" title="Download .html" onClick={() => downloadHtml(view.artifact.html!)}>
+                <Download className="size-4" />
+                <span className="hidden sm:inline">Download .html</span>
               </Button>
             )}
             <Button variant="ghost" size="icon" aria-label="Collapse canvas" onClick={() => canvas.setOpen(false)}>

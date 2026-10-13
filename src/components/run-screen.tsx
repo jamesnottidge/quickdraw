@@ -32,7 +32,7 @@ export function RunScreen({ view, runId }: { view: RunView; runId: string | null
       <div className="h-full">
         {thread}
         <Sheet open={canvas.open && !!panel} onOpenChange={canvas.setOpen}>
-          <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 data-[side=right]:sm:max-w-full">
+          <SheetContent side="right" showCloseButton={false} className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-full">
             <SheetTitle className="sr-only">Report</SheetTitle>
             {panel}
           </SheetContent>

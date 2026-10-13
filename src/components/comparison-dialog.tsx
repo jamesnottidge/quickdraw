@@ -48,7 +48,7 @@ export function ComparisonDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] gap-5 overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[90svh] gap-5 overflow-y-auto overflow-x-hidden sm:max-w-3xl [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle>Cost and speed comparison</DialogTitle>
           <DialogDescription>
@@ -81,30 +81,36 @@ function Result({ data }: { data: ComparisonResult }) {
           <TableRow>
             <TableHead>Approach</TableHead>
             <TableHead className="text-right">Cost</TableHead>
-            <TableHead className="text-right">vs harness</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">vs harness</TableHead>
             <TableHead className="text-right">Time</TableHead>
-            <TableHead className="text-right">vs harness</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">vs harness</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow className="bg-muted/50 font-medium">
-            <TableCell>
-              {harness.label} <Badge className="ml-2">Actual</Badge>
+            <TableCell className="whitespace-normal">
+              {harness.label} <Badge className="ml-1 align-middle">Actual</Badge>
             </TableCell>
             <TableCell className="text-right tabular-nums">{formatUsd(harness.costUsd)}</TableCell>
-            <TableCell className="text-right text-muted-foreground">1×</TableCell>
+            <TableCell className="hidden text-right text-muted-foreground sm:table-cell">1×</TableCell>
             <TableCell className="text-right tabular-nums">{formatDuration(harness.wallMs)}</TableCell>
-            <TableCell className="text-right text-muted-foreground">1×</TableCell>
+            <TableCell className="hidden text-right text-muted-foreground sm:table-cell">1×</TableCell>
           </TableRow>
           {alternatives.map((a) => (
             <TableRow key={a.id}>
-              <TableCell>
-                {a.label} <Badge variant="outline" className="ml-2 font-normal">Estimate</Badge>
+              <TableCell className="whitespace-normal">
+                {a.label} <Badge variant="outline" className="ml-1 align-middle font-normal">Estimate</Badge>
               </TableCell>
-              <TableCell className="text-right tabular-nums">{formatUsd(a.costUsd)}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">{formatRatio(a.costVsHarness)}</TableCell>
-              <TableCell className="text-right tabular-nums">{a.wallMs === null ? 'n/a' : formatDuration(a.wallMs)}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">{formatRatio(a.timeVsHarness)}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatUsd(a.costUsd)}
+                <span className="ml-1 text-xs text-muted-foreground sm:hidden">{formatRatio(a.costVsHarness)}</span>
+              </TableCell>
+              <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">{formatRatio(a.costVsHarness)}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {a.wallMs === null ? 'n/a' : formatDuration(a.wallMs)}
+                {a.wallMs !== null && <span className="ml-1 text-xs text-muted-foreground sm:hidden">{formatRatio(a.timeVsHarness)}</span>}
+              </TableCell>
+              <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">{formatRatio(a.timeVsHarness)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -150,7 +156,7 @@ function Result({ data }: { data: ComparisonResult }) {
         </AccordionItem>
       </Accordion>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="break-words text-xs text-muted-foreground">
         {data.pricesAsOf ? `Prices as of ${day(data.pricesAsOf)}` : 'Prices unavailable'}
         {' · '}
         {data.benchmarkedAt ? `speeds benchmarked ${day(data.benchmarkedAt)}` : 'speeds not benchmarked yet (time shows n/a)'}

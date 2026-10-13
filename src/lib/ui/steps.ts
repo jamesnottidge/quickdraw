@@ -41,13 +41,13 @@ export function deriveSteps(view: RunView): Step[] {
       key: 'read',
       label: 'Read',
       status: readDone ? 'completed' : searchDone && running ? 'active' : 'pending',
-      summary: view.pageOrder.length ? `${used} of ${plural(view.pageOrder.length, 'page')} used` : 'waiting',
+      summary: view.pageOrder.length ? `${used} of ${plural(view.pageOrder.length, 'page')} used` : readDone ? 'no pages found' : 'reading pages',
     },
     {
       key: 'write',
       label: 'Write',
       status: view.reportDone ? 'completed' : readDone && running ? 'active' : 'pending',
-      summary: view.reportDone ? 'report ready' : writeStarted ? 'writing the report' : 'waiting',
+      summary: view.reportDone ? 'report ready' : writeStarted ? 'writing the report' : 'starting',
     },
   ];
 
@@ -61,6 +61,9 @@ export function deriveSteps(view: RunView): Step[] {
       summary: a.status === 'ready' ? 'ready' : a.status === 'building' ? 'building' : a.status === 'failed' ? (a.reason ?? 'failed') : 'waiting',
     });
   }
+
+  // A step that has not started yet just says so; in-progress steps keep their own wording.
+  for (const s of steps) if (s.status === 'pending') s.summary = 'waiting';
 
   if (broken) {
     const active = steps.find((s) => s.status === 'active');

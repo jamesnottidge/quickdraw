@@ -67,6 +67,13 @@ describe('deriveSteps', () => {
     expect(deriveSteps(old).map((s) => s.key)).toEqual(['plan', 'search', 'read', 'write']);
   });
 
+  it('a finished run that found no pages says so instead of claiming it is still reading', () => {
+    const view = fold([start, ...drafted, submitted, ...searchStarted, ...searchDone, { type: 'report_done', text: 'No sources found.' }, { type: 'run_finished', costUsd: 0 }]);
+    const read = deriveSteps(view).find((s) => s.key === 'read')!;
+    expect(read.status).toBe('completed');
+    expect(read.summary).toBe('no pages found');
+  });
+
   it('summaries describe progress in words', () => {
     const view = fold([start, ...drafted, submitted]);
     const plan = deriveSteps(view).find((s) => s.key === 'plan')!;

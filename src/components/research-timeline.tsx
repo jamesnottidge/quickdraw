@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, ListChecks, PenLine, Search, Sparkles } from 'lucide-react';
+import { BookOpen, Check, ListChecks, PenLine, Search, Sparkles } from 'lucide-react';
 import {
   ChainOfThought,
   ChainOfThoughtComplete,
@@ -11,7 +11,6 @@ import {
   ChainOfThoughtTrigger,
 } from '@/components/nexus-ui/chain-of-thought';
 import { TextShimmer } from '@/components/nexus-ui/text-shimmer';
-import { Badge } from '@/components/ui/badge';
 import type { RunView } from '@/lib/events/reducer';
 import { domainOf } from '@/lib/report/sources';
 import { deriveSteps, type Step, type StepKey } from '@/lib/ui/steps';
@@ -30,6 +29,14 @@ const BAND_CLASS: Record<string, string> = {
   focused: 'text-muted-foreground',
   precise: 'text-emerald-600 dark:text-emerald-400',
 };
+
+/** Status is carried by the icon (a check when done, a pulse while active); Nexus shimmers the active title. */
+function StepIcon({ step }: { step: Step }) {
+  const Icon = ICONS[step.key];
+  if (step.status === 'completed') return <Check className="size-4 text-emerald-600 dark:text-emerald-400" />;
+  if (step.status === 'active') return <Icon className="size-4 animate-pulse text-foreground" />;
+  return <Icon className="size-4 text-muted-foreground/60" />;
+}
 
 function ScoreBar({ score }: { score: number }) {
   return (
@@ -91,8 +98,10 @@ function SearchDetail({ view }: { view: RunView }) {
   );
 }
 
-function ReadDetail({ view }: { view: RunView }) {
-  if (!view.pageOrder.length) return <p className="text-sm text-muted-foreground">Waiting for search results…</p>;
+function ReadDetail({ view, done }: { view: RunView; done: boolean }) {
+  if (!view.pageOrder.length) {
+    return <p className="text-sm text-muted-foreground">{done ? 'No usable pages were found for these searches.' : 'Waiting for search results…'}</p>;
+  }
   return (
     <ul className="flex flex-col gap-3">
       {view.pageOrder.map((url) => {
@@ -123,7 +132,7 @@ function StepDetail({ step, view }: { step: Step; view: RunView }) {
   switch (step.key) {
     case 'plan': return <PlanDetail view={view} />;
     case 'search': return <SearchDetail view={view} />;
-    case 'read': return <ReadDetail view={view} />;
+    case 'read': return <ReadDetail view={view} done={step.status === 'completed'} />;
     case 'write':
       return <p className="text-sm text-muted-foreground">{view.reportDone ? 'The report is ready.' : 'Writing the report from the summaries…'}</p>;
     case 'interactive':
@@ -141,7 +150,8 @@ function StepDetail({ step, view }: { step: Step; view: RunView }) {
 export function ResearchTimeline({ view }: { view: RunView }) {
   const steps = deriveSteps(view);
   const running = view.status === 'running';
-  const label = running ? 'Researching' : view.status === 'finished' ? 'Research complete' : view.status === 'idle' ? 'Research' : 'Research stopped';
+  const base = view.status === 'finished' ? 'Research complete' : view.status === 'idle' ? 'Research' : 'Research stopped';
+  const label = `${base} · ${steps.length} steps`;
   return (
     <ChainOfThought defaultOpen>
       <ChainOfThoughtTrigger>
@@ -149,16 +159,18 @@ export function ResearchTimeline({ view }: { view: RunView }) {
       </ChainOfThoughtTrigger>
       <ChainOfThoughtContent>
         {steps.map((step) => {
-          const Icon = ICONS[step.key];
           return (
-            <ChainOfThoughtStep key={step.key} status={step.status} hasContent>
-              <ChainOfThoughtStepTitle icon={<Icon className="size-4" />}>
+            <ChainOfThoughtStep key={step.key} status={step.status} hasContent={step.status !== 'pending'}>
+              {/* plain text only: an active title is shimmered, which would hide a badge's text */}
+              <ChainOfThoughtStepTitle icon={<StepIcon step={step} />}>
                 <span>{step.label}</span>
-                <Badge variant="secondary" className="ml-2 font-normal">{step.summary}</Badge>
+                <span className="ml-2 text-xs font-normal text-muted-foreground">· {step.summary}</span>
               </ChainOfThoughtStepTitle>
-              <ChainOfThoughtStepContent>
-                <StepDetail step={step} view={view} />
-              </ChainOfThoughtStepContent>
+              {step.status !== 'pending' && (
+                <ChainOfThoughtStepContent>
+                  <StepDetail step={step} view={view} />
+                </ChainOfThoughtStepContent>
+              )}
             </ChainOfThoughtStep>
           );
         })}

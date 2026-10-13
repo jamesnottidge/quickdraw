@@ -14,7 +14,7 @@ function CitationChip({ n, sources }: { n: number; sources: SourceView[] }) {
   if (!source) return <>[{n}]</>;
   return (
     <Citation citations={[{ url: source.url, title: source.title, description: source.snippet }]}>
-      <CitationTrigger label={String(n)} showFavicon={false} className="mx-0.5 align-super text-[0.7rem]" />
+      <CitationTrigger label={String(n)} showFavicon={false} className="mx-0.5 h-5 px-1.5 py-0 align-[0.15em]" />
       <CitationContent>
         <CitationItem />
       </CitationContent>
@@ -49,7 +49,7 @@ export function ReportView({ view }: { view: RunView }) {
 
   return (
     <article className="mx-auto w-full max-w-[46rem] px-6 py-10 sm:px-10">
-      <div className="prose prose-neutral max-w-none font-serif dark:prose-invert prose-headings:font-sans prose-headings:tracking-tight prose-h1:text-3xl prose-h1:leading-tight prose-p:text-[1.0625rem] prose-p:leading-8 prose-li:text-[1.0625rem] prose-li:leading-8 prose-a:text-foreground prose-a:underline-offset-4">
+      <div className="prose prose-neutral max-w-none font-serif dark:prose-invert prose-headings:font-sans prose-headings:tracking-tight prose-h1:text-3xl prose-h1:leading-tight prose-p:text-[1.0625rem] prose-p:leading-8 prose-li:text-[1.0625rem] prose-li:leading-8 prose-a:text-foreground prose-a:underline-offset-4 prose-blockquote:font-normal prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none [&_blockquote_p:first-of-type]:before:content-none [&_blockquote_p:last-of-type]:after:content-none [&_pre_code]:rounded-none [&_pre_code]:bg-transparent [&_pre_code]:p-0">
         <ReactMarkdown remarkPlugins={[remarkGfm, [remarkCitations, { max: sources.length }]]} skipHtml components={components}>
           {markdown}
         </ReactMarkdown>
