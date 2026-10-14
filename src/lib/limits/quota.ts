@@ -44,3 +44,8 @@ export async function claimQuota(db: Db, cfg: AppConfig, who: Who, now = new Dat
   }
   return { ok: true };
 }
+
+/** Chat replies (messages that are not research) have their own, looser per-device daily cap. */
+export async function claimChat(db: Db, cfg: AppConfig, who: Who, now = new Date()): Promise<boolean> {
+  return claim(db, utcDay(now), `chat:${deviceKey(who)}`, cfg.limits.chatsPerDevicePerDay);
+}

@@ -87,3 +87,13 @@ export async function settle(
   );
   return true;
 }
+
+/** Records spend that was never reserved (chat replies are too small to reserve for). */
+export async function addActualSpend(db: Db, usd: number, now = new Date()): Promise<void> {
+  if (!(usd > 0)) return;
+  await db.query(
+    `insert into spend_ledger(day, actual_usd) values ($1::date, $2::numeric)
+     on conflict (day) do update set actual_usd = spend_ledger.actual_usd + excluded.actual_usd`,
+    [utcDay(now), usd],
+  );
+}

@@ -9,6 +9,7 @@ export interface AppConfig {
   reasoning: { plan: ReasoningEffort; report: ReasoningEffort; artifact: ReasoningEffort };
   limits: {
     runsPerDevicePerDay: number;
+    chatsPerDevicePerDay: number;
     ipMultiplier: number;
     dailySpendCapUsd: number;
     dailySearchBudget: number;
@@ -18,6 +19,8 @@ export interface AppConfig {
     maxPages: number;
     maxPageChars: number;
   };
+  /** Messages that are not research questions: answered by the chat model if short, declined if long. */
+  chat: { maxInputTokens: number; maxTokens: number; historyTurns: number };
   scoring: { maxRounds: number; vagueBelow: number; preciseFrom: number };
   relevance: { threshold: number; maxChars: number };
   fetch: {
@@ -73,6 +76,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     limits: {
       runsPerDevicePerDay: num(env, 'RUNS_PER_DEVICE_PER_DAY', 5),
+      chatsPerDevicePerDay: num(env, 'CHATS_PER_DEVICE_PER_DAY', 30),
       ipMultiplier: 3,
       dailySpendCapUsd: num(env, 'DAILY_SPEND_CAP_USD', 5),
       dailySearchBudget: num(env, 'SEARCH_BUDGET_PER_DAY', 100),
@@ -82,6 +86,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
       maxPages: 30,
       maxPageChars: 200_000,
     },
+    chat: { maxInputTokens: num(env, 'CHAT_MAX_INPUT_TOKENS', 150), maxTokens: 800, historyTurns: 8 },
     scoring: { maxRounds: 3, vagueBelow: 1.5, preciseFrom: 2.4 },
     relevance: { threshold: 0.5, maxChars: 20_000 },
     fetch: {

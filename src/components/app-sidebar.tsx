@@ -50,20 +50,20 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Your sessions</SidebarGroupLabel>
+          <SidebarGroupLabel>Your conversations</SidebarGroupLabel>
           <SidebarGroupContent>
             {sessions.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-muted-foreground">Research you run in this browser appears here.</p>
+              <p className="px-2 py-1 text-xs text-muted-foreground">Conversations you have in this browser appear here.</p>
             ) : (
               <SidebarMenu>
                 {sessions.map((s) => (
                   <SidebarMenuItem key={s.id}>
-                    <SidebarMenuButton asChild isActive={pathname === `/run/${s.id}`} className="h-auto items-start gap-2 py-2">
-                      <Link href={`/run/${s.id}`} title={s.prompt}>
+                    <SidebarMenuButton asChild isActive={pathname === `/c/${s.id}`} className="h-auto items-start gap-2 py-2">
+                      <Link href={`/c/${s.id}`} title={s.title}>
                         <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', DOT[s.status])} aria-label={s.status} />
                         <span className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm">{truncate(s.prompt, 60)}</span>
-                          <span className="text-xs text-muted-foreground">{timeAgo(s.startedAt)}</span>
+                          <span className="truncate text-sm">{truncate(s.title, 60)}</span>
+                          <span className="text-xs text-muted-foreground">{timeAgo(s.updatedAt)}</span>
                         </span>
                       </Link>
                     </SidebarMenuButton>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bandFor, judgeRelevance, scoreQuery } from '@/lib/models/decisions';
+import { bandFor, classifyIntent, judgeRelevance, scoreQuery } from '@/lib/models/decisions';
 import { loadConfig } from '@/lib/config';
 import { SPECIFICITY_CRITERIA } from '@/lib/prompts';
 import { HttpError } from '@/lib/http/errors';
@@ -83,5 +83,25 @@ describe('judgeRelevance', () => {
     expect((await judgeRelevance(hi.ctx, cfg, 'q', 't')).relevant).toBe(true);
     const lo = testCtx(() => jsonResponse(nulBody(cfg.relevance.threshold - 0.01)));
     expect((await judgeRelevance(lo.ctx, cfg, 'q', 't')).relevant).toBe(false);
+  });
+});
+
+describe('classifyIntent', () => {
+  const body = (p: number) => ({ answers: { research: { type: 'noul', noul: p } }, usage: { input_tokens: 200, output_tokens: 1, cost: 0.00001 } });
+
+  it('asks one research-or-not question and thresholds the probability at 0.5', async () => {
+    const yes = testCtx(() => jsonResponse(body(0.9)));
+    expect(await classifyIntent(yes.ctx, cfg, 'How do honeybees navigate?')).toEqual({ research: true, score: 0.9 });
+    expect(yes.calls[0].body.state).toEqual({ text: 'How do honeybees navigate?' });
+    expect(yes.calls[0].body.questions.research.type).toBe('noul');
+    expect(yes.records[0].stage).toBe('intent');
+    const no = testCtx(() => jsonResponse(body(0.03)));
+    expect(await classifyIntent(no.ctx, cfg, 'hi')).toEqual({ research: false, score: 0.03 });
+  });
+
+  it('caps a huge paste before sending it', async () => {
+    const { ctx, calls } = testCtx(() => jsonResponse(body(0.1)));
+    await classifyIntent(ctx, cfg, 'x'.repeat(50_000));
+    expect(calls[0].body.state.text).toHaveLength(4000);
   });
 });

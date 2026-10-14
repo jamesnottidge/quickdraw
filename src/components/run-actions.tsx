@@ -4,7 +4,7 @@ import { Check, Copy, Download, FileText, Scale } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { RunView } from '@/lib/events/reducer';
-import type { CanvasController } from './run-screen';
+import type { CanvasController } from '@/hooks/useCanvas';
 
 export function RunActions({
   view,

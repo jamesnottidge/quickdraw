@@ -1,7 +1,7 @@
 'use client';
 
 import { use } from 'react';
-import { RunScreen } from '@/components/run-screen';
+import { ConversationScreen } from '@/components/conversation-screen';
 import { useReplay } from '@/hooks/useRunStream';
 
 function Centered({ children, error }: { children: React.ReactNode; error?: boolean }) {
@@ -14,11 +14,12 @@ function Centered({ children, error }: { children: React.ReactNode; error?: bool
   );
 }
 
+/** A single run by id, read-only. Conversations live at /c/<id>. */
 export default function RunPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { view, state } = useReplay(id);
   if (state === 'loading') return <Centered>Loading run…</Centered>;
   if (state === 'missing') return <Centered error>That run doesn&rsquo;t exist.</Centered>;
   if (state === 'error') return <Centered error>Couldn&rsquo;t load this run. Try reloading.</Centered>;
-  return <RunScreen key={id} view={view} runId={id} />;
+  return <ConversationScreen key={id} turns={[{ id, kind: 'research', prompt: view.prompt, runId: id, view }]} />;
 }

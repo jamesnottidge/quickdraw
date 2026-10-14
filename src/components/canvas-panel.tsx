@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { RunView } from '@/lib/events/reducer';
 import { ArtifactPane } from './artifact-pane';
 import { ReportView } from './report-view';
-import type { CanvasController, CanvasTab } from './run-screen';
+import type { CanvasController, CanvasTab } from '@/hooks/useCanvas';
 
 function downloadHtml(html: string) {
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));

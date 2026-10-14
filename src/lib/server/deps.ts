@@ -2,13 +2,15 @@ import type { AppConfig } from '@/lib/config';
 import { createSafeFetch } from '@/lib/fetch/safeFetch';
 import { fetchPage } from '@/lib/fetch/fetchPage';
 import type { CostMeter } from '@/lib/models/cost';
-import { judgeRelevance, scoreQuery } from '@/lib/models/decisions';
+import { chatReply } from '@/lib/models/chat';
+import { classifyIntent, judgeRelevance, scoreQuery } from '@/lib/models/decisions';
 import { streamMuse } from '@/lib/models/muse';
 import { makeTldr, summarize } from '@/lib/models/scaledown-chat';
 import type { ModelCtx } from '@/lib/models/types';
 import { createFakeDeps } from '@/lib/pipeline/fakes';
 import type { PipelineDeps } from '@/lib/pipeline/run';
 import { createTavilySearch } from '@/lib/search/tavily';
+import type { MessageDeps } from '@/lib/server/handleMessage';
 import type { Db } from '@/lib/store/db';
 import { insertModelCall } from '@/lib/store/modelCalls';
 import { upsertPage } from '@/lib/store/pages';
@@ -62,5 +64,36 @@ export function buildPipelineDeps(i: {
     fetchPage: (url) =>
       fetchPage(url, { fetchImpl: safeFetch, limits: config.fetch, maxChars: config.limits.maxPageChars, signal }),
     recordPage: (p) => upsertPage(db, runId, p),
+  };
+}
+
+/** Fake mode: anything that opens with a greeting, thanks or a question about Quickdraw is "not research". */
+const FAKE_SMALL_TALK = /^\s*(hi|hello|hey|thanks|thank you|who are you|what are you)\b/i;
+
+export function buildMessageDeps(i: { config: AppConfig; db: Db }): MessageDeps {
+  const { config, db } = i;
+  const buildDeps: MessageDeps['buildDeps'] = ({ runId, signal, meter }) =>
+    buildPipelineDeps({ config, runId, db, signal, meter });
+
+  if (process.env.FAKE_MODELS === '1') {
+    return {
+      classify: async (text) => !FAKE_SMALL_TALK.test(text),
+      chat: async () => ({ text: 'I\u2019m Quickdraw, a fast and efficient research agent. Ask me a research question.', costUsd: 0 }),
+      buildDeps,
+    };
+  }
+
+  // Intent and chat calls belong to no run, so there is nothing to store them against; their cost goes to the ledger.
+  const ctx: ModelCtx = {
+    apiKey: requireEnv('OPENROUTER_API_KEY'),
+    baseUrl: 'https://openrouter.ai/api',
+    fetchImpl: fetch,
+    retry: { retries: config.retry.museRetries, baseMs: config.retry.baseMs },
+    record: () => {},
+  };
+  return {
+    classify: async (text) => (await classifyIntent(ctx, config, text)).research,
+    chat: (history, text) => chatReply(ctx, config, history, text),
+    buildDeps,
   };
 }

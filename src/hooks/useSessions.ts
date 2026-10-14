@@ -2,9 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { RunListItem } from '@/lib/store/runs';
+import type { ConversationListItem } from '@/lib/store/conversations';
 
-export type SessionItem = RunListItem;
+export type SessionItem = ConversationListItem;
 
 /** Dispatch this on `window` to make the sidebar reload its list (run started / finished). */
 export const SESSIONS_REFRESH = 'cdm:sessions-refresh';
@@ -15,8 +15,8 @@ export function useSessions() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/runs', { cache: 'no-store' });
-      if (res.ok) setSessions(((await res.json()) as { runs: SessionItem[] }).runs);
+      const res = await fetch('/api/conversations', { cache: 'no-store' });
+      if (res.ok) setSessions(((await res.json()) as { conversations: SessionItem[] }).conversations);
     } catch {
       /* keep the previous list */
     }

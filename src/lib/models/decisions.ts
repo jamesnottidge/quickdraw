@@ -3,6 +3,8 @@ import type { AppConfig } from '@/lib/config';
 import type { Band } from '@/lib/events/schema';
 import { postJson } from '@/lib/http/postJson';
 import {
+  INTENT_CRITERIA,
+  INTENT_INSTRUCTION,
   RELEVANCE_CRITERIA,
   SPECIFICITY_CRITERIA,
   SPECIFICITY_INSTRUCTION,
@@ -77,4 +79,13 @@ export async function judgeRelevance(
   });
   const a = noulAnswer.parse(answers.relevant);
   return { relevance: a.noul, relevant: a.noul >= cfg.relevance.threshold };
+}
+
+/** Is this message a research question? The text is capped so a huge paste cannot inflate the call. */
+export async function classifyIntent(ctx: ModelCtx, cfg: AppConfig, message: string): Promise<{ research: boolean; score: number }> {
+  const answers = await decide(ctx, cfg, 'intent', message.slice(0, 4000), {
+    research: { type: 'noul', instructions: INTENT_INSTRUCTION, criteria: INTENT_CRITERIA },
+  });
+  const a = noulAnswer.parse(answers.research);
+  return { research: a.noul >= 0.5, score: a.noul };
 }

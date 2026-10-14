@@ -11,6 +11,7 @@ import { runPipeline, type PipelineDeps } from '@/lib/pipeline/run';
 import { PROMPTS_SNAPSHOT } from '@/lib/prompts';
 import type { Db } from '@/lib/store/db';
 import { insertEvent } from '@/lib/store/events';
+import { addTurn, createConversation } from '@/lib/store/conversations';
 import { createRun, finishRun } from '@/lib/store/runs';
 import { upsertSession } from '@/lib/store/sessions';
 
@@ -19,13 +20,15 @@ export interface StartRunInput {
   config: AppConfig;
   identity: Identity;
   prompt: string;
+  /** Adds the run as the next turn of this conversation (the caller has checked it belongs to the visitor). */
+  conversationId?: string;
   now?: Date;
   buildDeps: (x: { runId: string; signal: AbortSignal; meter: CostMeter }) => PipelineDeps;
 }
 
 export type StartRunResult =
   | { ok: false; status: 400 | 429; code: 'bad_prompt' | 'quota' | 'spend' | 'search'; message: string }
-  | { ok: true; runId: string; channel: Channel<RunEvent>; done: Promise<void> };
+  | { ok: true; runId: string; conversationId: string; channel: Channel<RunEvent>; done: Promise<void> };
 
 const TIME_LIMIT = 'The run hit its time limit before it could finish.';
 
@@ -87,6 +90,17 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     throw e;
   }
 
+  let conversationId: string;
+  try {
+    conversationId = input.conversationId ?? (await createConversation(db, { sessionId, title: prompt }));
+    await addTurn(db, { conversationId, kind: 'research', prompt, runId });
+  } catch (e) {
+    await finishRun(db, runId, { status: 'failed', costUsd: 0, error: 'Could not start the run.' }).catch(() => {});
+    await settle(db, runId, { actualUsd: 0, searchesUsed: 0 }).catch(() => {});
+    await releaseQuota(db, identity, now).catch(() => {});
+    throw e;
+  }
+
   const channel = new Channel<RunEvent>();
   const meter = new CostMeter();
   const abort = new AbortController();
@@ -141,5 +155,5 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     }
   })();
 
-  return { ok: true, runId, channel, done };
+  return { ok: true, runId, conversationId, channel, done };
 }

@@ -1,10 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { applyEvent, initialRunView, markStreamEnded, type RunView } from '@/lib/events/reducer';
 import type { RunEvent } from '@/lib/events/schema';
-import { consumeEventStream } from '@/lib/sse/consume';
-import { SESSIONS_REFRESH } from './useSessions';
 
 type Action =
   | { kind: 'event'; ev: RunEvent }
@@ -23,61 +21,6 @@ function reducer(state: RunView, action: Action): RunView {
     case 'reset':
       return initialRunView;
   }
-}
-
-export function useRunStream() {
-  const [view, dispatch] = useReducer(reducer, initialRunView);
-  const [rejected, setRejected] = useState<string | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-
-  // Leaving the page stops listening; the run itself carries on (and finishes) on the server.
-  useEffect(() => () => abortRef.current?.abort(), []);
-
-  const start = useCallback(async (prompt: string) => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setRejected(null);
-    setRunId(null);
-    setStarting(true);
-    dispatch({ kind: 'reset' });
-    try {
-      const res = await fetch('/api/run', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) {
-        const j = await res.json().catch(() => null);
-        setRejected(j?.message ?? 'The request failed. Please try again.');
-        return;
-      }
-      const id = res.headers.get('x-run-id');
-      setRunId(id);
-      if (id) window.history.replaceState(null, '', `/run/${id}`);
-      window.dispatchEvent(new Event(SESSIONS_REFRESH));
-      await consumeEventStream(res.body, (ev) => dispatch({ kind: 'event', ev }));
-    } catch {
-      /* a dropped connection is reported by markStreamEnded below, never as success */
-    } finally {
-      dispatch({ kind: 'ended' });
-      setStarting(false);
-      window.dispatchEvent(new Event(SESSIONS_REFRESH));
-    }
-  }, []);
-
-  const reset = useCallback(() => {
-    abortRef.current?.abort();
-    dispatch({ kind: 'reset' });
-    setRejected(null);
-    setRunId(null);
-    window.history.replaceState(null, '', '/');
-  }, []);
-
-  return { view, rejected, runId, starting, start, reset };
 }
 
 export function useReplay(runId: string) {

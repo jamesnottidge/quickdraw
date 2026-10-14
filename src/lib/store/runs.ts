@@ -65,28 +65,3 @@ export async function getRun(db: Db, id: string): Promise<RunRow | null> {
   const rows = await db.query<RunRow>(`select ${COLUMNS} from runs where id = $1`, [id]);
   return rows[0] ?? null;
 }
-
-export interface RunListItem {
-  id: string;
-  prompt: string;
-  status: 'running' | 'finished' | 'failed';
-  startedAt: string;
-}
-
-/** The runs started from one device (any IP), newest first. */
-export async function listRunsForDevice(db: Db, deviceId: string, limit = 50): Promise<RunListItem[]> {
-  const rows = await db.query<{ id: string; prompt: string; status: RunListItem['status']; started_at: Date | string }>(
-    `select r.id, r.prompt, r.status, r.started_at
-       from runs r join sessions s on s.id = r.session_id
-      where s.device_id = $1
-      order by r.started_at desc
-      limit $2`,
-    [deviceId, limit],
-  );
-  return rows.map((r) => ({
-    id: r.id,
-    prompt: r.prompt,
-    status: r.status,
-    startedAt: new Date(r.started_at).toISOString(),
-  }));
-}

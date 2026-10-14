@@ -1,6 +1,6 @@
 import type { RetryOpts } from '@/lib/http/retry';
 
-export type Stage = 'plan' | 'score_query' | 'judge_relevance' | 'summarize' | 'report' | 'tldr' | 'artifact';
+export type Stage = 'plan' | 'score_query' | 'judge_relevance' | 'summarize' | 'report' | 'tldr' | 'artifact' | 'intent' | 'chat';
 
 export interface ModelCallRecord {
   stage: Stage;

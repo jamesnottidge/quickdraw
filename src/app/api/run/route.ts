@@ -4,7 +4,7 @@ import { loadConfig } from '@/lib/config';
 import { DEVICE_COOKIE, deviceCookieHeader, resolveIdentity } from '@/lib/identity';
 import { buildPipelineDeps } from '@/lib/server/deps';
 import { startRun } from '@/lib/server/startRun';
-import { SSE_HEARTBEAT, encodeEvent } from '@/lib/sse/encode';
+import { runEventStream } from '@/lib/server/sseResponse';
 import { getDb } from '@/lib/store';
 
 export const runtime = 'nodejs';
@@ -55,45 +55,9 @@ export async function POST(req: Request): Promise<Response> {
 
     after(started.done); // keep the function alive until the run is persisted, even if the client leaves
 
-    headers.set('Content-Type', 'text/event-stream; charset=utf-8');
-    headers.set('Cache-Control', 'no-cache, no-transform');
-    headers.set('X-Accel-Buffering', 'no');
     headers.set('X-Run-Id', started.runId);
-
-    const encoder = new TextEncoder();
-    let cancelled = false;
-    let heartbeat: ReturnType<typeof setInterval> | undefined;
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        heartbeat = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(SSE_HEARTBEAT));
-          } catch {
-            /* stream already closed */
-          }
-        }, 15_000);
-        try {
-          for await (const ev of started.channel) {
-            if (cancelled) break;
-            controller.enqueue(encoder.encode(encodeEvent(ev)));
-          }
-        } catch {
-          /* the client went away; the run continues in the background */
-        } finally {
-          clearInterval(heartbeat);
-          try {
-            controller.close();
-          } catch {
-            /* already closed */
-          }
-        }
-      },
-      cancel() {
-        cancelled = true;
-        clearInterval(heartbeat);
-      },
-    });
-    return new Response(stream, { headers });
+    headers.set('X-Conversation-Id', started.conversationId);
+    return runEventStream(started.channel, headers);
   } catch (e) {
     console.error('POST /api/run failed', e);
     return Response.json({ error: 'server_error', message: 'Something went wrong starting the run.' }, { status: 500 });

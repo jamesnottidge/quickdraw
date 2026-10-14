@@ -12,7 +12,7 @@ Design: `docs/superpowers/specs/2026-10-13-cdm-research-agent-design.md` and
 
 ## Interface
 
-- **Sidebar:** this browser's past research sessions (listed by the device cookie), a "New research" button, a theme
+- **Sidebar:** this browser's past conversations (listed by the device cookie; each holds one or more messages), a "New research" button, a theme
   toggle and the privacy note.
 - **Thread:** a live timeline of the run (plan, search, read, write, interactive view) with scores, relevance and
   summaries as they arrive, then the TLDR.

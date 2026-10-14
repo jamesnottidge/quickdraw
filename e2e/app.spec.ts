@@ -30,7 +30,9 @@ test.describe('app shell', () => {
     const item = page.getByRole('link', { name: /sidebar session test/ });
     await expect(item).toBeVisible();
     await item.click();
-    await expect(page).toHaveURL(new RegExp(`/run/${id}$`));
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
+    await expect(page.getByText('sidebar session test').first()).toBeVisible();
+    expect(id).toBeTruthy();
   });
 
   test('does not show another browser\'s sessions', async ({ browser, page }) => {
@@ -89,6 +91,47 @@ test.describe('run view', () => {
   });
 });
 
+test.describe('conversation', () => {
+  async function send(page: Page, text: string) {
+    await page.getByRole('textbox').fill(text);
+    await page.getByRole('button', { name: 'Send' }).click();
+  }
+
+  test('a message that is not research gets a short reply from Quickdraw, with no research run', async ({ page }) => {
+    await page.goto('/');
+    await send(page, 'hello, who are you?');
+    await expect(page.getByText(/I.m Quickdraw, a fast and efficient research agent/)).toBeVisible();
+    await expect(page.getByText('Researching…')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole('link', { name: /hello, who are you/ }).first()).toBeVisible();
+  });
+
+  test('a long message that is not research is declined politely', async ({ page }) => {
+    await page.goto('/');
+    await send(page, 'hello ' + 'blah '.repeat(200));
+    await expect(page.getByText(/Please ask a research question/)).toBeVisible();
+  });
+
+  test('later messages join the same conversation, and reopening it shows every turn', async ({ page }) => {
+    await page.goto('/');
+    await send(page, 'hello there');
+    await expect(page.getByText(/I.m Quickdraw/)).toBeVisible();
+    const url = page.url();
+
+    await send(page, 'legal rag chunking strategies');
+    await expect(page.getByText(/Section-aware chunking helps legal RAG retrieve whole clauses/)).toBeVisible();
+    await expect(page.getByRole('textbox')).toHaveValue('');
+    expect(page.url()).toBe(url);
+
+    await page.goto(url);
+    await expect(page.getByText('hello there').first()).toBeVisible();
+    await expect(page.getByText('legal rag chunking strategies').first()).toBeVisible();
+    await expect(page.getByText(/I.m Quickdraw/)).toBeVisible();
+    await expect(page.getByText(/Section-aware chunking helps legal RAG retrieve whole clauses/)).toBeVisible();
+    await expect(page.getByRole('link', { name: /hello there/ })).toHaveCount(1); // one conversation, not two
+  });
+});
+
 test.describe('home', () => {
   test('shows the prompt, fills it from a suggestion, and streams a run live', async ({ page }) => {
     await page.goto('/');
@@ -104,7 +147,7 @@ test.describe('home', () => {
     // live progress arrives before the run finishes
     await expect(page.getByText('Researching…').first()).toBeVisible();
     await expect(page.getByText(/Section-aware chunking helps legal RAG retrieve whole clauses/)).toBeVisible();
-    await expect(page).toHaveURL(/\/run\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
 
     // the new session shows up in the sidebar
     await expect(page.getByRole('link', { name: /chunking strategies affect retrieval quality/i }).first()).toBeVisible();
